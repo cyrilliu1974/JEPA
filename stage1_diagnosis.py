@@ -388,7 +388,45 @@ class Stage1Diagnostician:
     # Task A：量化器訓練（Stage A warm-up）
     # ──────────────────────────────────────────────────────────────────
 
+    def _precompute_z_vectors(self, video_loader) -> torch.Tensor:
+        """
+        預先計算所有影片的 z 向量並存入記憶體。
 
+        策略：保留所有 spatial tokens，不做 temporal pooling。
+
+        為什麼不做 temporal pooling：
+          temporal pooling 把 98 個 spatial token 取平均，
+          會稀釋區分動作類別的維度訊號。
+          保留每個 spatial token 讓 codebook 看到
+          影片中不同空間區域（手、背景、目標物）的差異，
+          自然提供更豐富的訓練樣本。
+
+          50 部影片 × 1568 tokens = 78,400 個向量
+          vs 之前的 50 × 16 = 800 個向量
+
+        Returns: [N, D] tensor
+          N = 總 token 數（影片數 × N_tokens_per_video）
+          D = encoder_embed_dim
+        """
+        log.info("  Pre-computing z vectors (all spatial tokens, no temporal pooling)...")
+        all_z = []
+
+        with torch.no_grad():
+            for video_batch, _ in video_loader:
+                video_batch = video_batch.to(self.device)
+                z = self._encode(video_batch)   # [B, N_tokens, D]
+                B, N_tokens, D = z.shape
+                # 直接展開所有 token，不做 temporal pooling
+                all_z.append(z.reshape(B * N_tokens, D).cpu())
+
+        all_z_tensor = torch.cat(all_z, dim=0)  # [N, D]
+        n_videos = len(all_z_tensor) // (all_z[0].shape[0] // video_loader.batch_size
+                                         if len(all_z) > 0 else 1)
+        log.info(
+            f"  Pre-computed {len(all_z_tensor):,} tokens "
+            f"(~{len(all_z_tensor) // 1568} videos × 1568 tokens/video)"
+        )
+        return all_z_tensor
 
     def train_quantizer(
         self,
@@ -397,13 +435,19 @@ class Stage1Diagnostician:
         lr: float = 1e-3,
         perplexity_target_ratio: float = 0.4,  # 健康閾值：log(K) 的 40%
         dead_code_reset_interval: int = 200,
+        z_batch_size: int = 64,         # 預計算 z 向量的 batch size
     ):
         """
         Stage A：只訓練量化器，encoder 完全凍結。
 
         訓練策略：
-          即時從 video_loader 取得影片進行編碼與訓練。
-          這允許資料增強（例如隨機起點）發揮作用以提高多樣性。
+          先把所有影片的 z 向量預計算並存入記憶體，
+          再用這些 z 向量直接訓練量化器。
+
+          好處：
+          - 50 部影片 × 16 幀 = 800 個訓練樣本（不是 50 個）
+          - z_batch_size=64 → 每 epoch 12 個 batch，EMA 更新信號充足
+          - 不需要每步都跑 encoder，訓練速度快很多
 
         收斂標準：
           - Perplexity / log(K) > 0.4（健康碼本）
@@ -416,25 +460,38 @@ class Stage1Diagnostician:
             f"{perplexity_target_ratio:.0%} of log({self.codebook_size})"
         )
 
+        # ── Step 1：預計算所有 z 向量 ─────────────────────────────────
+        all_z_tensor = self._precompute_z_vectors(video_loader)
+
         # ── 用真實資料初始化 codebook ─────────────────────────────
         log.info("  Initializing codebook from real z-vectors...")
         with torch.no_grad():
-            init_z_vids = []
-            for video_batch, _ in video_loader:
-                video_batch = video_batch.to(self.device)
-                z = self._encode(video_batch)
-                z_frames = temporal_pool(z, self.num_frames)
-                B, T, D = z_frames.shape
-                init_z_vids.append(z_frames.reshape(B * T, D))
-                if sum(len(x) for x in init_z_vids) >= 512:
-                    break
-            init_z = torch.cat(init_z_vids, dim=0)[:512]
-            z_proj = self.quantizer.projection(init_z)
+            # 先過一次 projection，取得真實的投影後向量
+            # 隨機抽樣 512 個樣本來初始化，如果樣本不足則全用
+            n_sample = min(512, len(all_z_tensor))
+            sample_idx = torch.randperm(len(all_z_tensor))[:n_sample]
+            sample = all_z_tensor[sample_idx].to(self.device)
+            z_proj = self.quantizer.projection(sample)
             z_proj_norm = F.normalize(z_proj, dim=-1)
         self.quantizer.initialize_from_data(z_proj_norm)
         log.info("  ✅ Codebook initialization complete")
 
-        # ── Step 2：用影片串流即時編碼訓練量化器 ──────────────────────────────
+        # 建立 z 向量的 DataLoader（直接訓練量化器，不再跑 encoder）
+        from torch.utils.data import TensorDataset, DataLoader as _DL
+        z_dataset = TensorDataset(all_z_tensor)
+        z_loader  = _DL(
+            z_dataset,
+            batch_size=z_batch_size,
+            shuffle=True,
+            drop_last=False,
+        )
+        log.info(
+            f"  Z-vector loader: {len(all_z_tensor)} samples, "
+            f"batch_size={z_batch_size}, "
+            f"{len(z_loader)} batches per epoch"
+        )
+
+        # ── Step 2：用 z 向量訓練量化器 ──────────────────────────────
         optimizer = optim.Adam(self.quantizer.parameters(), lr=lr)
         scheduler = optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=warmup_iterations, eta_min=lr * 0.1
@@ -445,38 +502,25 @@ class Stage1Diagnostician:
 
         loss_history = []
         perplexity_history = []
-        collected_z_for_reset = []
 
         self.quantizer.train()
         step = 0
         converged = False
 
         while step < warmup_iterations and not converged:
-            for video_batch, _ in video_loader:
+            for (z_batch,) in z_loader:
                 if step >= warmup_iterations:
                     break
 
-                video_batch = video_batch.to(self.device)
+                z_batch = z_batch.to(self.device)  # [B, D]
 
-                # Encoder forward（no_grad）
-                with torch.no_grad():
-                    z = self._encode(video_batch)                     # [B, N_tokens, D]
-                    z_frames = temporal_pool(z, self.num_frames)      # [B, T, D]
-
-                # 直接量化 z 向量
-                B, T, D = z_frames.shape
-                z_batch = z_frames.reshape(B * T, D)
+                # 直接量化 z 向量（不需要 temporal pool，已經是 frame-level）
                 _, _, loss = self.quantizer.encode(z_batch)
 
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
-
-                # 收集 z 用於 dead code reset
-                collected_z_for_reset.append(z_batch.detach())
-                if len(collected_z_for_reset) > 10:
-                    collected_z_for_reset.pop(0)
 
                 # 監控
                 perp = self.quantizer.compute_perplexity()
@@ -510,10 +554,11 @@ class Stage1Diagnostician:
                             f"(Perplexity {perp_0:.2f} → {perp_50:.2f})"
                         )
 
-                # 死碼重置
+                # 死碼重置（直接用 z_batch，不需要另外收集）
                 if step % dead_code_reset_interval == 0 and step > 0:
-                    z_pool = torch.cat(collected_z_for_reset, dim=0)
-                    n_reset = self.quantizer.reset_dead_codes(z_pool)
+                    n_reset = self.quantizer.reset_dead_codes(
+                        z_batch.detach()
+                    )
                     if n_reset > 0:
                         log.info(
                             f"  ↻ Reset {n_reset} dead codes at step {step}"
@@ -554,6 +599,7 @@ class Stage1Diagnostician:
             "total_steps":            step,
             "converged":              converged,
             "codebook_healthy":       final_perp / max_perplexity >= perplexity_target_ratio,
+            "n_z_vectors":            len(all_z_tensor),
         }
 
         return converged
@@ -586,19 +632,22 @@ class Stage1Diagnostician:
             if video.dim() == 4:
                 video = video.unsqueeze(0)
             video = video.to(self.device)
-            self.encoder.eval()  # 確保每次測試時 encoder 都在 eval 模式
-            # 重複量化 n_repeats 次
+            self.encoder.eval()
             all_symbols = []
             for _ in range(n_repeats):
-                z = self._encode(video)
-                z_frames = temporal_pool(z, self.num_frames)
-                frame_symbols = []
-                for t in range(self.num_frames):
-                    _, idx, _ = self.quantizer.encode(z_frames[:, t, :])
-                    frame_symbols.append(idx[0].item())
-                all_symbols.append(frame_symbols)
+                z = self._encode(video)               # [1, N_tokens, D]
+                N_tokens = z.shape[1]
+                z_flat = z.reshape(N_tokens, -1)
+                symbols = []
+                chunk = 256
+                for i in range(0, N_tokens, chunk):
+                    _, idx, _ = self.quantizer.encode(z_flat[i:i+chunk])
+                    symbols.extend(idx.cpu().tolist())
+                # 取 mode
+                from collections import Counter
+                most_common = Counter(symbols).most_common(1)[0][0]
+                all_symbols.append([most_common] * self.num_frames)
 
-            # 計算每個時間步的一致性率
             consistency_per_frame = []
             for t in range(self.num_frames):
                 symbols_at_t = [run[t] for run in all_symbols]
@@ -635,19 +684,34 @@ class Stage1Diagnostician:
         self,
         videos: List[torch.Tensor],
     ) -> List[List[int]]:
-        """收集一批影片的符號序列（eval 模式，no_grad）"""
+        """
+        收集一批影片的符號序列（eval 模式，no_grad）。
+
+        策略：對每個 spatial token 單獨量化，
+        取每部影片最常出現的符號作為代表符號。
+        這樣能捕捉影片內部的空間語義差異。
+        """
         all_sequences = []
         for video in videos:
             if video.dim() == 4:
                 video = video.unsqueeze(0)
             video = video.to(self.device)
-            z = self._encode(video)
-            z_frames = temporal_pool(z, self.num_frames)
+            z = self._encode(video)               # [1, N_tokens, D]
+            N_tokens = z.shape[1]
+            z_flat = z.reshape(N_tokens, -1)      # [N_tokens, D]
+
+            # 對每個 token 量化
             symbols = []
-            for t in range(self.num_frames):
-                _, idx, _ = self.quantizer.encode(z_frames[:, t, :])
-                symbols.append(idx[0].item())
-            all_sequences.append(symbols)
+            chunk = 256  # 分批量化，避免記憶體溢出
+            for i in range(0, N_tokens, chunk):
+                z_chunk = z_flat[i:i+chunk]
+                _, idx, _ = self.quantizer.encode(z_chunk)
+                symbols.extend(idx.cpu().tolist())
+
+            # 取 mode（最常出現的符號）作為這部影片的代表
+            from collections import Counter
+            most_common = Counter(symbols).most_common(1)[0][0]
+            all_sequences.append([most_common] * self.num_frames)
         return all_sequences
 
     @torch.no_grad()
@@ -673,15 +737,18 @@ class Stage1Diagnostician:
         for cond_idx, seed in enumerate([42, 1337]):
             torch.manual_seed(seed)
             for _ in range(n_samples):
-                # noise 使用 [B, C, T, H, W] 格式，與真實影片一致
                 noise = torch.randn(1, 3, self.num_frames, 224, 224).to(self.device)
-                z = self._encode(noise)
-                z_frames = temporal_pool(z, self.num_frames)
+                z = self._encode(noise)                   # [1, N_tokens, D]
+                N_tokens = z.shape[1]
+                z_flat = z.reshape(N_tokens, -1)
                 symbols = []
-                for t in range(self.num_frames):
-                    _, idx, _ = self.quantizer.encode(z_frames[:, t, :])
-                    symbols.append(idx[0].item())
-                baseline_exp.record(cond_idx, symbols)
+                chunk = 256
+                for i in range(0, N_tokens, chunk):
+                    _, idx, _ = self.quantizer.encode(z_flat[i:i+chunk])
+                    symbols.extend(idx.cpu().tolist())
+                from collections import Counter
+                most_common = Counter(symbols).most_common(1)[0][0]
+                baseline_exp.record(cond_idx, [most_common] * self.num_frames)
 
         return baseline_exp
 

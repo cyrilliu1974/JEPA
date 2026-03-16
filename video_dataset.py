@@ -62,7 +62,6 @@ def _load_video_frames(
     video_path: str,
     num_frames: int = 16,
     target_size: Tuple[int, int] = (224, 224),
-    random_start_frame: bool = False,
 ) -> Optional[torch.Tensor]:
     """
     載入影片並採樣指定幀數。
@@ -72,14 +71,6 @@ def _load_video_frames(
         tensor [C, T, H, W]，float32，範圍 [0, 1]
         失敗時返回 None
     """
-    
-    def _get_indices(total):
-        if random_start_frame and total > num_frames:
-            max_start = total - num_frames
-            start_idx = torch.randint(0, max_start + 1, (1,)).item()
-            return torch.arange(start_idx, start_idx + num_frames).long()
-        else:
-            return torch.linspace(0, total - 1, num_frames).long()
 
     # ── 嘗試 torchcodec（V-JEPA 2 官方推薦）──────────────────────────
     try:
@@ -91,8 +82,8 @@ def _load_video_frames(
         if total == 0:
             raise ValueError("Empty video")
 
-        # 採樣 num_frames 幀
-        indices = _get_indices(total).tolist()
+        # 均勻採樣 num_frames 幀
+        indices = torch.linspace(0, total - 1, num_frames).long().tolist()
         frames_data = decoder.get_frames_at(indices=indices)
         
         # 處理不同版本的 torchcodec (可能是 FrameBatch 物件或直接是 tensor)
@@ -136,7 +127,7 @@ def _load_video_frames(
         if total == 0:
             raise ValueError("Empty video")
 
-        indices = _get_indices(total).tolist()
+        indices = torch.linspace(0, total - 1, num_frames).long().tolist()
         frames = vr.get_batch(indices)   # [T, H, W, C]
         frames = frames.float() / 255.0
         frames = frames.permute(3, 0, 1, 2)  # [C, T, H, W]
@@ -158,7 +149,7 @@ def _load_video_frames(
             raise ValueError("Empty video")
 
         total = frames.shape[0]
-        indices = _get_indices(total)
+        indices = torch.linspace(0, total - 1, num_frames).long()
         frames = frames[indices]                   # [T, H, W, C]
         frames = frames.float() / 255.0
         frames = frames.permute(3, 0, 1, 2)       # [C, T, H, W]
@@ -185,7 +176,7 @@ def _load_video_frames(
         if total == 0:
             raise ValueError("Empty video")
 
-        indices = set(_get_indices(total).tolist())
+        indices = set(torch.linspace(0, total - 1, num_frames).long().tolist())
         frame_list = []
         frame_idx = 0
 
@@ -304,14 +295,12 @@ class KineticsMiniDataset(Dataset):
         device: str = "cpu",
         max_per_class: int = 50,        # 每個類別最多載入幾個影片
         min_per_class: int = 5,         # 低於此數量的類別發出警告
-        random_start_frame: bool = False,
     ):
         self.video_root = Path(video_root)
         self.num_frames = num_frames
         self.target_size = target_size
         self.processor = processor
         self.device = device
-        self.random_start_frame = random_start_frame
 
         # 掃描所有影片
         self.samples: List[Tuple[str, int, str]] = []  # (path, class_idx, class_name)
@@ -372,7 +361,7 @@ class KineticsMiniDataset(Dataset):
         video_path, class_idx, class_name = self.samples[idx]
 
         frames = _load_video_frames(
-            video_path, self.num_frames, self.target_size, self.random_start_frame
+            video_path, self.num_frames, self.target_size
         )
 
         if frames is None:
@@ -540,7 +529,6 @@ def build_train_loader(
         processor=processor,
         device="cpu",            # DataLoader 裡不在 GPU 上做，避免記憶體問題
         max_per_class=max_per_class,
-        random_start_frame=True,
     )
 
     loader = DataLoader(

@@ -96,8 +96,13 @@ def _load_video_frames(
         if not isinstance(frames, torch.Tensor):
             frames = torch.from_numpy(frames)
         
-        frames = frames.float() / 255.0  # [T, H, W, C]
-        frames = frames.permute(3, 0, 1, 2)                # [C, T, H, W]
+        frames = frames.float() / 255.0
+
+        # torchcodec 可能回傳 [T, H, W, C] 或 [T, C, H, W]
+        if frames.shape[-1] == 3:
+            frames = frames.permute(3, 0, 1, 2)  # [T, H, W, C] -> [C, T, H, W]
+        else:
+            frames = frames.permute(1, 0, 2, 3)  # [T, C, H, W] -> [C, T, H, W]
         frames = F.interpolate(
             frames.unsqueeze(0),
             size=(num_frames, *target_size),
@@ -230,8 +235,10 @@ def _apply_vjepa2_preprocessor(
         frames_thwc = frames.permute(1, 2, 3, 0)  # [T, H, W, C]
         frames_uint8 = (frames_thwc * 255).byte()
 
+        # convert to numpy list to avoid "Unable to infer channel dimension format"
+        video_np = list(frames_uint8.cpu().numpy())
 
-        processed = processor(list(frames_uint8), return_tensors="pt")
+        processed = processor(video_np, return_tensors="pt")
         # 取出 pixel_values
         if hasattr(processed, "pixel_values"):
             return processed.pixel_values.to(device)

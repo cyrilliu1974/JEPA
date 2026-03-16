@@ -388,7 +388,36 @@ class Stage1Diagnostician:
     # Task A：量化器訓練（Stage A warm-up）
     # ──────────────────────────────────────────────────────────────────
 
+    def _precompute_z_vectors(self, video_loader) -> torch.Tensor:
+        """
+        預先計算所有影片的 z 向量並存入記憶體。
 
+        核心思路：
+          50 部影片 × 16 幀 = 800 個 frame-level 向量
+          比直接用 video_loader（每 epoch 只有 3-12 個 batch）
+          提供更密集的 EMA 更新信號。
+
+        Returns: [N, D] tensor，N = 總幀數，D = encoder_embed_dim
+        """
+        log.info("  Pre-computing z vectors for all videos...")
+        all_z = []
+
+        with torch.no_grad():
+            for video_batch, _ in video_loader:
+                video_batch = video_batch.to(self.device)
+                z = self._encode(video_batch)              # [B, N_tokens, D]
+                z_frames = temporal_pool(z, self.num_frames)  # [B, T, D]
+                B, T, D = z_frames.shape
+                # 展開成 [B×T, D]
+                all_z.append(z_frames.reshape(B * T, D).cpu())
+
+        all_z_tensor = torch.cat(all_z, dim=0)  # [N, D]
+        n_videos = len(all_z_tensor) // self.num_frames
+        log.info(
+            f"  Pre-computed {len(all_z_tensor)} frame vectors "
+            f"({n_videos} videos × {self.num_frames} frames)"
+        )
+        return all_z_tensor
 
     def train_quantizer(
         self,
@@ -397,13 +426,19 @@ class Stage1Diagnostician:
         lr: float = 1e-3,
         perplexity_target_ratio: float = 0.4,  # 健康閾值：log(K) 的 40%
         dead_code_reset_interval: int = 200,
+        z_batch_size: int = 64,         # 預計算 z 向量的 batch size
     ):
         """
         Stage A：只訓練量化器，encoder 完全凍結。
 
         訓練策略：
-          即時從 video_loader 取得影片進行編碼與訓練。
-          這允許資料增強（例如隨機起點）發揮作用以提高多樣性。
+          先把所有影片的 z 向量預計算並存入記憶體，
+          再用這些 z 向量直接訓練量化器。
+
+          好處：
+          - 50 部影片 × 16 幀 = 800 個訓練樣本（不是 50 個）
+          - z_batch_size=64 → 每 epoch 12 個 batch，EMA 更新信號充足
+          - 不需要每步都跑 encoder，訓練速度快很多
 
         收斂標準：
           - Perplexity / log(K) > 0.4（健康碼本）
@@ -416,25 +451,38 @@ class Stage1Diagnostician:
             f"{perplexity_target_ratio:.0%} of log({self.codebook_size})"
         )
 
+        # ── Step 1：預計算所有 z 向量 ─────────────────────────────────
+        all_z_tensor = self._precompute_z_vectors(video_loader)
+
         # ── 用真實資料初始化 codebook ─────────────────────────────
         log.info("  Initializing codebook from real z-vectors...")
         with torch.no_grad():
-            init_z_vids = []
-            for video_batch, _ in video_loader:
-                video_batch = video_batch.to(self.device)
-                z = self._encode(video_batch)
-                z_frames = temporal_pool(z, self.num_frames)
-                B, T, D = z_frames.shape
-                init_z_vids.append(z_frames.reshape(B * T, D))
-                if sum(len(x) for x in init_z_vids) >= 512:
-                    break
-            init_z = torch.cat(init_z_vids, dim=0)[:512]
-            z_proj = self.quantizer.projection(init_z)
+            # 先過一次 projection，取得真實的投影後向量
+            # 隨機抽樣 512 個樣本來初始化，如果樣本不足則全用
+            n_sample = min(512, len(all_z_tensor))
+            sample_idx = torch.randperm(len(all_z_tensor))[:n_sample]
+            sample = all_z_tensor[sample_idx].to(self.device)
+            z_proj = self.quantizer.projection(sample)
             z_proj_norm = F.normalize(z_proj, dim=-1)
         self.quantizer.initialize_from_data(z_proj_norm)
         log.info("  ✅ Codebook initialization complete")
 
-        # ── Step 2：用影片串流即時編碼訓練量化器 ──────────────────────────────
+        # 建立 z 向量的 DataLoader（直接訓練量化器，不再跑 encoder）
+        from torch.utils.data import TensorDataset, DataLoader as _DL
+        z_dataset = TensorDataset(all_z_tensor)
+        z_loader  = _DL(
+            z_dataset,
+            batch_size=z_batch_size,
+            shuffle=True,
+            drop_last=False,
+        )
+        log.info(
+            f"  Z-vector loader: {len(all_z_tensor)} samples, "
+            f"batch_size={z_batch_size}, "
+            f"{len(z_loader)} batches per epoch"
+        )
+
+        # ── Step 2：用 z 向量訓練量化器 ──────────────────────────────
         optimizer = optim.Adam(self.quantizer.parameters(), lr=lr)
         scheduler = optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=warmup_iterations, eta_min=lr * 0.1
@@ -445,38 +493,25 @@ class Stage1Diagnostician:
 
         loss_history = []
         perplexity_history = []
-        collected_z_for_reset = []
 
         self.quantizer.train()
         step = 0
         converged = False
 
         while step < warmup_iterations and not converged:
-            for video_batch, _ in video_loader:
+            for (z_batch,) in z_loader:
                 if step >= warmup_iterations:
                     break
 
-                video_batch = video_batch.to(self.device)
+                z_batch = z_batch.to(self.device)  # [B, D]
 
-                # Encoder forward（no_grad）
-                with torch.no_grad():
-                    z = self._encode(video_batch)                     # [B, N_tokens, D]
-                    z_frames = temporal_pool(z, self.num_frames)      # [B, T, D]
-
-                # 直接量化 z 向量
-                B, T, D = z_frames.shape
-                z_batch = z_frames.reshape(B * T, D)
+                # 直接量化 z 向量（不需要 temporal pool，已經是 frame-level）
                 _, _, loss = self.quantizer.encode(z_batch)
 
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
-
-                # 收集 z 用於 dead code reset
-                collected_z_for_reset.append(z_batch.detach())
-                if len(collected_z_for_reset) > 10:
-                    collected_z_for_reset.pop(0)
 
                 # 監控
                 perp = self.quantizer.compute_perplexity()
@@ -510,10 +545,11 @@ class Stage1Diagnostician:
                             f"(Perplexity {perp_0:.2f} → {perp_50:.2f})"
                         )
 
-                # 死碼重置
+                # 死碼重置（直接用 z_batch，不需要另外收集）
                 if step % dead_code_reset_interval == 0 and step > 0:
-                    z_pool = torch.cat(collected_z_for_reset, dim=0)
-                    n_reset = self.quantizer.reset_dead_codes(z_pool)
+                    n_reset = self.quantizer.reset_dead_codes(
+                        z_batch.detach()
+                    )
                     if n_reset > 0:
                         log.info(
                             f"  ↻ Reset {n_reset} dead codes at step {step}"
@@ -554,6 +590,7 @@ class Stage1Diagnostician:
             "total_steps":            step,
             "converged":              converged,
             "codebook_healthy":       final_perp / max_perplexity >= perplexity_target_ratio,
+            "n_z_vectors":            len(all_z_tensor),
         }
 
         return converged

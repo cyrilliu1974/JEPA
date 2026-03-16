@@ -1,0 +1,72 @@
+[
+  {
+    "aim_id": "[43]",
+    "version": "2026-03-16T10:05:21.647038",
+    "human_label": "object_geometry=flying_kite",
+    "context": "{\"MI_score\": 0.0105, \"chi2_p_value\": 0.0132, \"condition_value\": \"flying_kite\", \"experiment\": \"stage1_intervention_object_geometry\", \"is_significant\": true, \"mean_JSD\": 0.1026, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"flying_kite\": 43, \"high_jump\": 55}, \"timestamp\": \"2026-03-16T10:05:21.646979\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[55]",
+    "version": "2026-03-16T10:05:21.647069",
+    "human_label": "object_geometry=high_jump",
+    "context": "{\"MI_score\": 0.0105, \"chi2_p_value\": 0.0132, \"condition_value\": \"high_jump\", \"experiment\": \"stage1_intervention_object_geometry\", \"is_significant\": true, \"mean_JSD\": 0.1026, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"flying_kite\": 43, \"high_jump\": 55}, \"timestamp\": \"2026-03-16T10:05:21.647048\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[43]",
+    "version": "2026-03-16T10:05:34.947462",
+    "human_label": "motion_speed=marching",
+    "context": "{\"MI_score\": 0.015, \"chi2_p_value\": 0.003, \"condition_value\": \"marching\", \"experiment\": \"stage1_intervention_motion_speed\", \"is_significant\": true, \"mean_JSD\": 0.1225, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"archery\": 43, \"marching\": 43}, \"timestamp\": \"2026-03-16T10:05:34.947400\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[43]",
+    "version": "2026-03-16T10:05:34.947491",
+    "human_label": "motion_speed=archery",
+    "context": "{\"MI_score\": 0.015, \"chi2_p_value\": 0.003, \"condition_value\": \"archery\", \"experiment\": \"stage1_intervention_motion_speed\", \"is_significant\": true, \"mean_JSD\": 0.1225, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"archery\": 43, \"marching\": 43}, \"timestamp\": \"2026-03-16T10:05:34.947470\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[5]",
+    "version": "2026-03-16T11:36:48.988110",
+    "human_label": "grasp_angle=archery",
+    "context": "{\"MI_score\": 0.036, \"chi2_p_value\": 0.0001, \"condition_value\": \"archery\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.1897, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"archery\": 5, \"bowling\": 5}, \"timestamp\": \"2026-03-16T11:36:48.988047\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[5]",
+    "version": "2026-03-16T11:36:48.988140",
+    "human_label": "grasp_angle=bowling",
+    "context": "{\"MI_score\": 0.036, \"chi2_p_value\": 0.0001, \"condition_value\": \"bowling\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.1897, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"archery\": 5, \"bowling\": 5}, \"timestamp\": \"2026-03-16T11:36:48.988119\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[5]",
+    "version": "2026-03-16T11:37:02.101496",
+    "human_label": "object_geometry=flying_kite",
+    "context": "{\"MI_score\": 0.036, \"chi2_p_value\": 0.0001, \"condition_value\": \"flying_kite\", \"experiment\": \"stage1_intervention_object_geometry\", \"is_significant\": true, \"mean_JSD\": 0.1897, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"flying_kite\": 5, \"high_jump\": 5}, \"timestamp\": \"2026-03-16T11:37:02.101442\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[5]",
+    "version": "2026-03-16T11:37:02.101521",
+    "human_label": "object_geometry=high_jump",
+    "context": "{\"MI_score\": 0.036, \"chi2_p_value\": 0.0001, \"condition_value\": \"high_jump\", \"experiment\": \"stage1_intervention_object_geometry\", \"is_significant\": true, \"mean_JSD\": 0.1897, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"flying_kite\": 5, \"high_jump\": 5}, \"timestamp\": \"2026-03-16T11:37:02.101503\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[5]",
+    "version": "2026-03-16T11:37:15.325814",
+    "human_label": "motion_speed=marching",
+    "context": "{\"MI_score\": 0.1173, \"chi2_p_value\": 0.0, \"condition_value\": \"marching\", \"experiment\": \"stage1_intervention_motion_speed\", \"is_significant\": true, \"mean_JSD\": 0.3425, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"archery\": 5, \"marching\": 5}, \"timestamp\": \"2026-03-16T11:37:15.325756\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[5]",
+    "version": "2026-03-16T11:37:15.325850",
+    "human_label": "motion_speed=archery",
+    "context": "{\"MI_score\": 0.1173, \"chi2_p_value\": 0.0, \"condition_value\": \"archery\", \"experiment\": \"stage1_intervention_motion_speed\", \"is_significant\": true, \"mean_JSD\": 0.3425, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"archery\": 5, \"marching\": 5}, \"timestamp\": \"2026-03-16T11:37:15.325822\"}",
+    "usage_count": 1
+  }
+]

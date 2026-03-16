@@ -1,0 +1,128 @@
+[
+  {
+    "aim_id": "[7]",
+    "version": "2026-03-16T09:57:23.602948",
+    "human_label": "grasp_angle=0deg",
+    "context": "{\"MI_score\": 0.1739, \"chi2_p_value\": 0.0, \"condition_value\": \"0deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.4274, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 7, \"30deg\": 7, \"60deg\": 7, \"90deg\": 7}, \"timestamp\": \"2026-03-16T09:57:23.599947\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[7]",
+    "version": "2026-03-16T09:57:23.602948",
+    "human_label": "grasp_angle=30deg",
+    "context": "{\"MI_score\": 0.1739, \"chi2_p_value\": 0.0, \"condition_value\": \"30deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.4274, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 7, \"30deg\": 7, \"60deg\": 7, \"90deg\": 7}, \"timestamp\": \"2026-03-16T09:57:23.602948\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[7]",
+    "version": "2026-03-16T09:57:23.602948",
+    "human_label": "grasp_angle=60deg",
+    "context": "{\"MI_score\": 0.1739, \"chi2_p_value\": 0.0, \"condition_value\": \"60deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.4274, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 7, \"30deg\": 7, \"60deg\": 7, \"90deg\": 7}, \"timestamp\": \"2026-03-16T09:57:23.602948\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[7]",
+    "version": "2026-03-16T09:57:23.602948",
+    "human_label": "grasp_angle=90deg",
+    "context": "{\"MI_score\": 0.1739, \"chi2_p_value\": 0.0, \"condition_value\": \"90deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.4274, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 7, \"30deg\": 7, \"60deg\": 7, \"90deg\": 7}, \"timestamp\": \"2026-03-16T09:57:23.602948\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[20]",
+    "version": "2026-03-16T10:03:44.492686",
+    "human_label": "grasp_angle=0deg",
+    "context": "{\"MI_score\": 0.5623, \"chi2_p_value\": 0.0, \"condition_value\": \"0deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.8326, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 20, \"30deg\": 33, \"60deg\": 33, \"90deg\": 33}, \"timestamp\": \"2026-03-16T10:03:44.492686\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[33]",
+    "version": "2026-03-16T10:03:44.492686",
+    "human_label": "grasp_angle=30deg",
+    "context": "{\"MI_score\": 0.5623, \"chi2_p_value\": 0.0, \"condition_value\": \"30deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.8326, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 20, \"30deg\": 33, \"60deg\": 33, \"90deg\": 33}, \"timestamp\": \"2026-03-16T10:03:44.492686\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[33]",
+    "version": "2026-03-16T10:03:44.492686",
+    "human_label": "grasp_angle=60deg",
+    "context": "{\"MI_score\": 0.5623, \"chi2_p_value\": 0.0, \"condition_value\": \"60deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.8326, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 20, \"30deg\": 33, \"60deg\": 33, \"90deg\": 33}, \"timestamp\": \"2026-03-16T10:03:44.492686\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[33]",
+    "version": "2026-03-16T10:03:44.492686",
+    "human_label": "grasp_angle=90deg",
+    "context": "{\"MI_score\": 0.5623, \"chi2_p_value\": 0.0, \"condition_value\": \"90deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.8326, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 20, \"30deg\": 33, \"60deg\": 33, \"90deg\": 33}, \"timestamp\": \"2026-03-16T10:03:44.492686\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[26]",
+    "version": "2026-03-16T10:06:14.618609",
+    "human_label": "grasp_angle=0deg",
+    "context": "{\"MI_score\": 0.4574, \"chi2_p_value\": 0.0, \"condition_value\": \"0deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.4923, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 26, \"30deg\": 26, \"60deg\": 26, \"90deg\": 26}, \"timestamp\": \"2026-03-16T10:06:14.618609\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[26]",
+    "version": "2026-03-16T10:06:14.618609",
+    "human_label": "grasp_angle=30deg",
+    "context": "{\"MI_score\": 0.4574, \"chi2_p_value\": 0.0, \"condition_value\": \"30deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.4923, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 26, \"30deg\": 26, \"60deg\": 26, \"90deg\": 26}, \"timestamp\": \"2026-03-16T10:06:14.618609\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[26]",
+    "version": "2026-03-16T10:06:14.618609",
+    "human_label": "grasp_angle=60deg",
+    "context": "{\"MI_score\": 0.4574, \"chi2_p_value\": 0.0, \"condition_value\": \"60deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.4923, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 26, \"30deg\": 26, \"60deg\": 26, \"90deg\": 26}, \"timestamp\": \"2026-03-16T10:06:14.618609\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[26]",
+    "version": "2026-03-16T10:06:14.618609",
+    "human_label": "grasp_angle=90deg",
+    "context": "{\"MI_score\": 0.4574, \"chi2_p_value\": 0.0, \"condition_value\": \"90deg\", \"experiment\": \"stage1_intervention_grasp_angle\", \"is_significant\": true, \"mean_JSD\": 0.4923, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"0deg\": 26, \"30deg\": 26, \"60deg\": 26, \"90deg\": 26}, \"timestamp\": \"2026-03-16T10:06:14.618609\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[26]",
+    "version": "2026-03-16T10:06:17.142628",
+    "human_label": "object_geometry=sphere",
+    "context": "{\"MI_score\": 0.2886, \"chi2_p_value\": 0.0, \"condition_value\": \"sphere\", \"experiment\": \"stage1_intervention_object_geometry\", \"is_significant\": true, \"mean_JSD\": 0.427, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"cube\": 26, \"cylinder\": 26, \"sphere\": 26}, \"timestamp\": \"2026-03-16T10:06:17.142628\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[26]",
+    "version": "2026-03-16T10:06:17.142628",
+    "human_label": "object_geometry=cube",
+    "context": "{\"MI_score\": 0.2886, \"chi2_p_value\": 0.0, \"condition_value\": \"cube\", \"experiment\": \"stage1_intervention_object_geometry\", \"is_significant\": true, \"mean_JSD\": 0.427, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"cube\": 26, \"cylinder\": 26, \"sphere\": 26}, \"timestamp\": \"2026-03-16T10:06:17.142628\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[26]",
+    "version": "2026-03-16T10:06:17.142628",
+    "human_label": "object_geometry=cylinder",
+    "context": "{\"MI_score\": 0.2886, \"chi2_p_value\": 0.0, \"condition_value\": \"cylinder\", \"experiment\": \"stage1_intervention_object_geometry\", \"is_significant\": true, \"mean_JSD\": 0.427, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"cube\": 26, \"cylinder\": 26, \"sphere\": 26}, \"timestamp\": \"2026-03-16T10:06:17.142628\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[55]",
+    "version": "2026-03-16T10:06:19.272723",
+    "human_label": "motion_speed=slow",
+    "context": "{\"MI_score\": 0.589, \"chi2_p_value\": 0.0, \"condition_value\": \"slow\", \"experiment\": \"stage1_intervention_motion_speed\", \"is_significant\": true, \"mean_JSD\": 0.6371, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"fast\": 6, \"normal\": 6, \"slow\": 55}, \"timestamp\": \"2026-03-16T10:06:19.272723\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[6]",
+    "version": "2026-03-16T10:06:19.272723",
+    "human_label": "motion_speed=normal",
+    "context": "{\"MI_score\": 0.589, \"chi2_p_value\": 0.0, \"condition_value\": \"normal\", \"experiment\": \"stage1_intervention_motion_speed\", \"is_significant\": true, \"mean_JSD\": 0.6371, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"fast\": 6, \"normal\": 6, \"slow\": 55}, \"timestamp\": \"2026-03-16T10:06:19.272723\"}",
+    "usage_count": 1
+  },
+  {
+    "aim_id": "[6]",
+    "version": "2026-03-16T10:06:19.272723",
+    "human_label": "motion_speed=fast",
+    "context": "{\"MI_score\": 0.589, \"chi2_p_value\": 0.0, \"condition_value\": \"fast\", \"experiment\": \"stage1_intervention_motion_speed\", \"is_significant\": true, \"mean_JSD\": 0.6371, \"stage\": \"Stage1_Frozen_Encoder\", \"symbol_mapping\": {\"fast\": 6, \"normal\": 6, \"slow\": 55}, \"timestamp\": \"2026-03-16T10:06:19.272723\"}",
+    "usage_count": 1
+  }
+]

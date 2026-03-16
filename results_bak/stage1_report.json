@@ -1,0 +1,121 @@
+{
+  "stage": "Stage1",
+  "timestamp": "2026-03-16T10:04:30.455029",
+  "criteria": {
+    "h1_consistency": 0.95,
+    "h2_chi2_p": 0.01,
+    "h2_mi_ratio": 5.0,
+    "codebook_active": 0.3
+  },
+  "results": {
+    "quantizer_training": {
+      "final_perplexity": 4.171,
+      "final_perplexity_ratio": 1.003,
+      "final_active_ratio": 0.766,
+      "total_steps": 500,
+      "converged": false,
+      "codebook_healthy": "True"
+    },
+    "h1_stability": {
+      "mean_consistency": 1.0,
+      "per_video": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "threshold": 0.95,
+      "passed": "True"
+    },
+    "intervention_experiments": {
+      "grasp_angle": {
+        "variable": "grasp_angle",
+        "mi_score": 0.4574,
+        "chi2_p_value": 0.0,
+        "is_significant": true,
+        "mean_jsd": 0.4923,
+        "condition_symbol_mapping": {
+          "0deg": 26,
+          "30deg": 26,
+          "60deg": 26,
+          "90deg": 26
+        },
+        "n_samples_per_condition": {
+          "0deg": 30,
+          "30deg": 30,
+          "60deg": 30,
+          "90deg": 30
+        }
+      },
+      "object_geometry": {
+        "variable": "object_geometry",
+        "mi_score": 0.2886,
+        "chi2_p_value": 0.0,
+        "is_significant": true,
+        "mean_jsd": 0.427,
+        "condition_symbol_mapping": {
+          "sphere": 26,
+          "cube": 26,
+          "cylinder": 26
+        },
+        "n_samples_per_condition": {
+          "sphere": 30,
+          "cube": 30,
+          "cylinder": 30
+        }
+      },
+      "motion_speed": {
+        "variable": "motion_speed",
+        "mi_score": 0.589,
+        "chi2_p_value": 0.0,
+        "is_significant": true,
+        "mean_jsd": 0.6371,
+        "condition_symbol_mapping": {
+          "slow": 55,
+          "normal": 6,
+          "fast": 6
+        },
+        "n_samples_per_condition": {
+          "slow": 25,
+          "normal": 25,
+          "fast": 25
+        }
+      }
+    },
+    "random_baseline_mi": 0.0597,
+    "criteria_results": {
+      "h1_consistency": {
+        "value": 1.0,
+        "threshold": 0.95,
+        "passed": "True"
+      },
+      "h2_chi2_p": {
+        "values": {
+          "grasp_angle": 0.0,
+          "object_geometry": 0.0,
+          "motion_speed": 0.0
+        },
+        "threshold": 0.01,
+        "passed": true
+      },
+      "h2_mi_ratio": {
+        "values": {
+          "grasp_angle": 7.66,
+          "object_geometry": 4.83,
+          "motion_speed": 9.86
+        },
+        "baseline_mi": 0.0597,
+        "threshold": 5.0,
+        "passed": false
+      },
+      "codebook_active": {
+        "value": 0.9844,
+        "perplexity": 5.412,
+        "threshold": 0.3,
+        "passed": true
+      }
+    }
+  },
+  "passed": false
+}

@@ -1,0 +1,115 @@
+{
+  "stage": "Stage1",
+  "timestamp": "2026-03-16T11:34:10.898373",
+  "criteria": {
+    "h1_consistency": 0.95,
+    "h2_chi2_p": 0.01,
+    "h2_mi_ratio": 5.0,
+    "codebook_active": 0.3
+  },
+  "results": {
+    "quantizer_training": {
+      "final_perplexity": 4.635,
+      "final_perplexity_ratio": 2.229,
+      "final_active_ratio": 0.625,
+      "total_steps": 3000,
+      "converged": false,
+      "codebook_healthy": "True",
+      "n_z_vectors": 75264
+    },
+    "h1_stability": {
+      "mean_consistency": 1.0,
+      "per_video": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "threshold": 0.95,
+      "passed": "True"
+    },
+    "intervention_experiments": {
+      "grasp_angle": {
+        "variable": "grasp_angle",
+        "mi_score": 0.036,
+        "chi2_p_value": 0.000119,
+        "is_significant": true,
+        "mean_jsd": 0.1897,
+        "condition_symbol_mapping": {
+          "archery": 5,
+          "bowling": 5
+        },
+        "n_samples_per_condition": {
+          "archery": 10,
+          "bowling": 10
+        }
+      },
+      "object_geometry": {
+        "variable": "object_geometry",
+        "mi_score": 0.036,
+        "chi2_p_value": 0.000119,
+        "is_significant": true,
+        "mean_jsd": 0.1897,
+        "condition_symbol_mapping": {
+          "flying_kite": 5,
+          "high_jump": 5
+        },
+        "n_samples_per_condition": {
+          "flying_kite": 10,
+          "high_jump": 10
+        }
+      },
+      "motion_speed": {
+        "variable": "motion_speed",
+        "mi_score": 0.1173,
+        "chi2_p_value": 0.0,
+        "is_significant": true,
+        "mean_jsd": 0.3425,
+        "condition_symbol_mapping": {
+          "marching": 5,
+          "archery": 5
+        },
+        "n_samples_per_condition": {
+          "marching": 10,
+          "archery": 10
+        }
+      }
+    },
+    "random_baseline_mi": 0.0,
+    "criteria_results": {
+      "h1_consistency": {
+        "value": 1.0,
+        "threshold": 0.95,
+        "passed": "True"
+      },
+      "h2_chi2_p": {
+        "values": {
+          "grasp_angle": 0.000119,
+          "object_geometry": 0.000119,
+          "motion_speed": 0.0
+        },
+        "threshold": 0.01,
+        "passed": true
+      },
+      "h2_mi_ratio": {
+        "values": {
+          "grasp_angle": 3600000.0,
+          "object_geometry": 3600000.0,
+          "motion_speed": 11730000.0
+        },
+        "baseline_mi": 0.0,
+        "threshold": 5.0,
+        "passed": true
+      },
+      "codebook_active": {
+        "value": 0.625,
+        "perplexity": 4.707,
+        "threshold": 0.3,
+        "passed": true
+      }
+    }
+  },
+  "passed": true
+}

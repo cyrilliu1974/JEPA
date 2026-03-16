@@ -48,7 +48,8 @@ project_root/
 │   ├── analyze_aim.py             # Post-hoc dictionary analysis
 │   └── enhanced_aim_dictionary.py # Extended dictionary management
 │
-├── test_vjepa2_latent.py          # ⚠️ Run this FIRST before Stage 1
+├── test_vjepa2_latent.py          # ⚠️ Run this FIRST — checks z norm, N_tokens
+├── test_projection_health.py      # Run if Loss=0 persists — checks projection layer
 │
 ├── checkpoints/                   # Model weights (not tracked by git)
 │   └── README.md                  # Download instructions (see below)
@@ -274,7 +275,63 @@ Fix: Ensure `encoder.eval()` is called and all augmentation is disabled before r
 
 ---
 
-### Using your own video data
+**Issue 5.5: Verify projection layer health (optional but recommended)**
+
+If `test_vjepa2_latent.py` shows `z norm > 10` and you have modified the quantizer, run this additional check to confirm the projection layer produces distinguishable vectors:
+
+```bash
+python test_projection_health.py
+```
+
+No arguments needed. It generates synthetic vectors matching your encoder's norm characteristics and reports:
+
+```
+Cosine similarity between different inputs: 0.03
+(Close to 1.0 = still collapsing, close to 0 = distinguishable)
+```
+
+A value below 0.1 means the projection layer is working correctly. If cosine similarity is above 0.9, increase `--projection_dim`. This test runs in under 10 seconds on CPU with no model download required.
+
+---
+
+**Issue 6: Perplexity drops during training (EMA collapse)**
+
+```
+Step   0 | Loss=0.0015 | Perplexity=2.69/4.16 (65%) | Active=14%
+Step 100 | Loss=0.0000 | Perplexity=1.02/4.16 (25%) | Active=14%  ← stop here
+```
+
+Cause: The EMA decay rate is too conservative for your dataset's diversity. With `ema_decay=0.99`, the codebook updates only 1% per step. If your dataset has limited diversity (fewer videos, fewer classes, or semantically similar classes), the codebook vectors get pulled toward the data mean and collapse, even though individual vectors were distinguishable at initialization.
+
+The code includes an early detection check at Step 50 that will warn you before Step 100:
+
+```
+⚠️  Perplexity dropping (2.69 → 1.02). EMA collapse likely.
+    Stop and retry with lower ema_decay / higher commitment_cost.
+    Suggested: --ema_decay 0.90 --commitment_cost 2.0
+```
+
+Fix: Stop training and rerun with more aggressive EMA settings:
+
+```bash
+python stage1_diagnosis.py --run_with_kinetics \
+    --video_root ./data/kinetics_mini/val \
+    --encoder_embed_dim 1024 \
+    --device cuda \
+    --ema_decay 0.90 \
+    --commitment_cost 2.0 \
+    --output_dir ./stage1_results
+```
+
+General guidance for tuning these parameters:
+
+| Dataset diversity | Recommended ema_decay | Recommended commitment_cost |
+|---|---|---|
+| High (many classes, distinct) | 0.99 | 0.25 |
+| Medium (5–10 classes) | 0.95 | 1.0 |
+| Low (few classes, similar) | 0.90 | 2.0 |
+
+If you are unsure, start with `ema_decay=0.95` and `commitment_cost=1.0` as a safe default for most datasets.
 
 The diagnostic works with any video dataset. Point `--video_root` at any directory with class subdirectories containing `.mp4` files:
 

@@ -93,8 +93,8 @@ class Stage1AIMQuantizer(nn.Module):
         input_dim: int = 1408,
         projection_dim: int = 256,
         codebook_size: int = 64,
-        commitment_cost: float = 0.25,
-        ema_decay: float = 0.99,
+        commitment_cost: float = 1.0,    # 提高：讓 encoder 更積極靠近 codebook
+        ema_decay: float = 0.95,         # 降低：讓 codebook 更積極更新
     ):
         super().__init__()
         self.codebook_size = codebook_size
@@ -272,6 +272,8 @@ class Stage1Diagnostician:
         device: str = "cuda",
         output_dir: str = "./stage1_results",
         encoder_embed_dim: int = 1408,  # ViT-g
+        ema_decay: float = 0.95,
+        commitment_cost: float = 1.0,
     ):
         self.encoder = encoder.eval()
         self.num_frames = num_frames
@@ -289,7 +291,10 @@ class Stage1Diagnostician:
             input_dim=encoder_embed_dim,
             projection_dim=projection_dim,
             codebook_size=codebook_size,
+            ema_decay=ema_decay,
+            commitment_cost=commitment_cost,
         ).to(device)
+        log.info(f"  Quantizer: ema_decay={ema_decay}, commitment_cost={commitment_cost}")
 
         self.aim_dict = AIMDictionary(
             str(self.output_dir / "aim_dictionary_stage1.json")
@@ -440,6 +445,26 @@ class Stage1Diagnostician:
                         f"({perp/max_perplexity:.0%}) | "
                         f"Active={active:.0%}"
                     )
+
+                # ── Early Detection：Step 50 檢查 Perplexity 趨勢 ──────
+                # 如果 Perplexity 從 Step 0 到 Step 50 是下降的，
+                # 代表 EMA collapse 正在發生，繼續跑沒有意義
+                if step == 50:
+                    perp_0  = perplexity_history[0]
+                    perp_50 = perplexity_history[49]
+                    if perp_50 < perp_0 * 0.8:
+                        log.warning(
+                            f"⚠️  Perplexity dropping "
+                            f"({perp_0:.2f} → {perp_50:.2f}). "
+                            f"EMA collapse likely. "
+                            f"Stop and retry with lower ema_decay / higher commitment_cost. "
+                            f"Suggested: --ema_decay 0.90 --commitment_cost 2.0"
+                        )
+                    else:
+                        log.info(
+                            f"  ✅ Step 50 check passed "
+                            f"(Perplexity {perp_0:.2f} → {perp_50:.2f})"
+                        )
 
                 # 死碼重置
                 if step % dead_code_reset_interval == 0 and step > 0:
@@ -1017,6 +1042,14 @@ def parse_args():
                        help="Run with mock encoder for testing (no checkpoint needed)")
     parser.add_argument("--run_with_kinetics", action="store_true",
                        help="Run with real Kinetics-mini videos + real encoder")
+    parser.add_argument("--ema_decay", type=float, default=0.95,
+                       help="EMA decay for codebook update. "
+                            "Lower = more aggressive updates. "
+                            "Try 0.90 if EMA collapse occurs. (default: 0.95)")
+    parser.add_argument("--commitment_cost", type=float, default=1.0,
+                       help="Commitment cost for VQ loss. "
+                            "Higher = encoder pulled more strongly to codebook. "
+                            "Try 2.0 if EMA collapse occurs. (default: 1.0)")
     return parser.parse_args()
 
 
@@ -1091,6 +1124,8 @@ def run_mock_test(args):
         device="cpu",
         output_dir=args.output_dir,
         encoder_embed_dim=args.encoder_embed_dim,
+        ema_decay=args.ema_decay,
+        commitment_cost=args.commitment_cost,
     )
 
     report = diagnostician.run_full_diagnosis(
@@ -1211,6 +1246,8 @@ def run_kinetics_test(args):
         device=args.device,
         output_dir=args.output_dir,
         encoder_embed_dim=args.encoder_embed_dim,
+        ema_decay=args.ema_decay,
+        commitment_cost=args.commitment_cost,
     )
 
     # 執行完整診斷

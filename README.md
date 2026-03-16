@@ -1,483 +1,328 @@
-\# AIM × V-JEPA 2: Interpretability via Emergent Symbol Systems
+# AIM × V-JEPA 2: Interpretability via Emergent Symbol Systems
 
-
-
-> \*\*Can we read what a world model is thinking?\*\*
-
+> **Can we read what a world model is thinking?**
 > This project proposes a first answer.
 
+---
 
+## The Problem
 
-\---
-
-
-
-\## The Problem
-
-
-
-\[V-JEPA 2](https://github.com/facebookresearch/vjepa2) (Meta FAIR, 2025) is one of the most capable video understanding models to date. It learns by predicting missing regions of video in \*\*latent space\*\* — an abstract mathematical space that is deliberately designed to ignore pixel-level details and capture only the essential structure of the physical world.
-
-
+[V-JEPA 2](https://github.com/facebookresearch/vjepa2) (Meta FAIR, 2025) is one of the most capable video understanding models to date. It learns by predicting missing regions of video in **latent space** — an abstract mathematical space that is deliberately designed to ignore pixel-level details and capture only the essential structure of the physical world.
 
 This design makes V-JEPA 2 powerful. It also makes it opaque.
 
+When V-JEPA 2 watches a robot grasp an object, its internal representation is a high-dimensional continuous vector. There is no way to directly read what the model "understood" from the video. Researchers can observe that it performs well on benchmarks, but cannot inspect the reasoning pathway that led to that performance. This is the **interpretability gap** that motivates this project.
 
+---
 
-When V-JEPA 2 watches a robot grasp an object, its internal representation is a high-dimensional continuous vector. There is no way to directly read what the model "understood" from the video. Researchers can observe that it performs well on benchmarks, but cannot inspect the reasoning pathway that led to that performance. This is the \*\*interpretability gap\*\* that motivates this project.
+## The Idea
 
-
-
-\---
-
-
-
-\## The Idea
-
-
-
-The \*\*AI Mother Tongue (AIM) framework\*\* (\[arXiv:2507.10566](https://arxiv.org/abs/2507.10566)) proposes that agents in multi-agent reinforcement learning can develop a self-emergent discrete symbol system — a compressed semantic language that arises from the agents' own learning dynamics, without any human-defined vocabulary.
-
-
+The **AI Mother Tongue (AIM) framework** ([arXiv:2507.10566](https://arxiv.org/abs/2507.10566)) proposes that agents in multi-agent reinforcement learning can develop a self-emergent discrete symbol system — a compressed semantic language that arises from the agents' own learning dynamics, without any human-defined vocabulary.
 
 The key observation that connects AIM to V-JEPA 2 is architectural:
 
-
-
 > Both frameworks operate in latent space. V-JEPA 2 predicts in latent space. AIM compresses in latent space. They are naturally compatible.
 
+This means AIM's Vector Quantized VAE (VQ-VAE) can be attached directly to V-JEPA 2's encoder output — not as a pixel decoder, not as a language model head, but as a **lightweight quantization probe** that converts continuous latent vectors into discrete symbol sequences.
 
-
-This means AIM's Vector Quantized VAE (VQ-VAE) can be attached directly to V-JEPA 2's encoder output — not as a pixel decoder, not as a language model head, but as a \*\*lightweight quantization probe\*\* that converts continuous latent vectors into discrete symbol sequences.
-
-
-
-If the resulting symbols systematically vary with physical conditions (object geometry, motion speed, grasp angle), then the symbols constitute a \*\*structured internal narrative\*\* — a first form of machine-readable explanation of what V-JEPA 2 perceived.
-
-
+If the resulting symbols systematically vary with physical conditions (object geometry, motion speed, grasp angle), then the symbols constitute a **structured internal narrative** — a first form of machine-readable explanation of what V-JEPA 2 perceived.
 
 This is what we mean by interpretability: not pixel reconstruction, not natural language explanation, but a statistically auditable symbolic record of the model's latent state transitions.
 
+---
 
-
-\---
-
-
-
-\## Project Structure
-
-
+## Project Structure
 
 ```
-
-project\_root/
-
-├                 # Core integration modules
-
-│   ├── stage1\_diagnosis.py        # Main entry point for Stage 1
-
-│   ├── aim\_intervention\_builder.py # Intervention experiments \& dictionary
-
+project_root/
+├── aim_bridge/                    # Core integration modules
+│   ├── stage1_diagnosis.py        # Main entry point for Stage 1
+│   ├── aim_intervention_builder.py # Intervention experiments & dictionary
 │   ├── quantizer.py               # AIM VQ quantizer for V-JEPA 2
-
-│   └── video\_dataset.py           # Video loading \& preprocessing
-
+│   └── video_dataset.py           # Video loading & preprocessing
 │
-
 ├── aim/                           # AIM framework (cyrilliu1974/AI-Mother-Tongue)
-
-│   ├── aim\_dictionary\_json.py     # Symbol dictionary persistence
-
-│   ├── aim\_adapter.py             # Data bridge for DRCB framework
-
-│   ├── aim\_collusion\_framework.py # DRCB collusion detection
-
-│   ├── analyze\_aim.py             # Post-hoc dictionary analysis
-
-│   └── enhanced\_aim\_dictionary.py # Extended dictionary management
-
+│   ├── aim_dictionary_json.py     # Symbol dictionary persistence
+│   ├── aim_adapter.py             # Data bridge for DRCB framework
+│   ├── aim_collusion_framework.py # DRCB collusion detection
+│   ├── analyze_aim.py             # Post-hoc dictionary analysis
+│   └── enhanced_aim_dictionary.py # Extended dictionary management
 │
-
+├── test_vjepa2_latent.py          # ⚠️ Run this FIRST before Stage 1
+│
 ├── checkpoints/                   # Model weights (not tracked by git)
-
-
+│   └── README.md                  # Download instructions (see below)
 │
-
 ├── data/                          # Video datasets (not tracked by git)
-
-│   └── kinetics\_mini/
-
+│   └── kinetics_mini/
 │       └── val/
-
 │           ├── archery/
-
 │           ├── bowling/
-
-│           ├── flying\_kite/
-
-│           ├── high\_jump/
-
+│           ├── flying_kite/
+│           ├── high_jump/
 │           └── marching/
-
 │
-
-└── stage1\_results/                # Auto-generated outputs
-
-&#x20;   ├── stage1\_report.json
-
-&#x20;   ├── aim\_dictionary\_stage1.json
-
-&#x20;   └── figures/
-
+└── stage1_results/                # Auto-generated outputs
+    ├── stage1_report.json
+    ├── aim_dictionary_stage1.json
+    └── figures/
 ```
 
+---
 
-
-\---
-
-
-
-\## Four-Stage Research Roadmap
-
-
+## Four-Stage Research Roadmap
 
 This project follows a progressive integration strategy. Each stage has explicit pass/fail criteria before proceeding.
 
-
-
 | Stage | Goal | V-JEPA 2 | Status |
-
 |---|---|---|---|
-
-| \*\*Stage 1\*\* | Verify AIM symbols capture semantic differences | Frozen (no training) | ✅ In progress |
-
+| **Stage 1** | Verify AIM symbols capture semantic differences | Frozen (no training) | ✅ In progress |
 | Stage 2 | Quantizer warm-up with stable codebook | Frozen | Planned |
-
 | Stage 3 | Joint training with symmetric quantization | Fine-tuned | Future work |
-
 | Stage 4 | Action-conditioned symbolic world model | Fine-tuned | Future work |
 
+**Stage 1 is the focus of this repository.** The encoder is completely frozen — no V-JEPA 2 weights are modified. Only the lightweight AIM quantizer is trained.
 
-
-\*\*Stage 1 is the focus of this repository.\*\* The encoder is completely frozen — no V-JEPA 2 weights are modified. Only the lightweight AIM quantizer is trained.
-
-
-
-\### Stage 1 Pass Criteria
-
-
+### Stage 1 Pass Criteria
 
 | Metric | Threshold | Meaning |
-
 |---|---|---|
-
 | H1 Symbol Stability | > 95% | Same video → same symbol across 20 repeats |
-
 | H2 Chi-square p-value | < 0.01 | Symbol distributions differ significantly across conditions |
-
 | H2 MI Ratio | > 5× baseline | Experiment MI >> random noise MI |
-
 | Codebook Active Ratio | > 30% | No codebook collapse |
 
+---
 
+## Model Download
 
-\---
-
-
-
-\## Model Download
-
-
-
-\### Option A: HuggingFace (Recommended)
-
-
+### Option A: HuggingFace (Recommended)
 
 The code loads models automatically from HuggingFace on first run. No manual download needed.
 
-
-
 ```python
-
-\# Handled automatically inside stage1\_diagnosis.py
-
-\# ViT-L is used by default (--encoder\_embed\_dim 1024)
-
+# Handled automatically inside stage1_diagnosis.py
+# ViT-L is used by default (--encoder_embed_dim 1024)
 ```
 
-
-
-\### Option B: Direct Download
-
-
+### Option B: Direct Download
 
 Place checkpoint files in the `checkpoints/` directory.
 
-
-
-\*\*ViT-L\*\* (recommended for Stage 1, \~1.2 GB):
-
+**ViT-L** (recommended for Stage 1, ~1.2 GB):
 ```bash
-
 mkdir -p checkpoints
-
-wget https://dl.fbaipublicfiles.com/vjepa2/vitl.pt -O checkpoints/vjepa2\_vitl.pt
-
+wget https://dl.fbaipublicfiles.com/vjepa2/vitl.pt -O checkpoints/vjepa2_vitl.pt
 ```
 
-
-
-\*\*ViT-g\*\* (larger, \~10 GB):
-
+**ViT-g** (larger, ~10 GB):
 ```bash
-
 mkdir -p checkpoints
-
-wget https://dl.fbaipublicfiles.com/vjepa2/vitg.pt -O checkpoints/vjepa2\_vitg.pt
-
+wget https://dl.fbaipublicfiles.com/vjepa2/vitg.pt -O checkpoints/vjepa2_vitg.pt
 ```
 
+### Which Model to Use
 
-
-\### Which Model to Use
-
-
-
-| Model | embed\_dim | File Size | Recommended For |
-
+| Model | embed_dim | File Size | Recommended For |
 |---|---|---|---|
+| ViT-L | 1024 | ~1.2 GB | Stage 1 (concept validation) |
+| ViT-g | 1408 | ~10 GB | Full experiments |
 
-| ViT-L | 1024 | \~1.2 GB | Stage 1 (concept validation) |
+For Stage 1, ViT-L is sufficient. Use `--encoder_embed_dim 1024` when running with ViT-L.
 
-| ViT-g | 1408 | \~10 GB | Full experiments |
+---
 
-
-
-For Stage 1, ViT-L is sufficient. Use `--encoder\_embed\_dim 1024` when running with ViT-L.
-
-
-
-\---
-
-
-
-\## Installation
-
-
+## Installation
 
 ```bash
-
-git clone https://github.com/YOUR\_USERNAME/aim-vjepa2.git
-
+git clone https://github.com/YOUR_USERNAME/aim-vjepa2.git
 cd aim-vjepa2
-
 pip install -r requirements.txt
-
 ```
-
-
 
 For video decoding, install at least one of:
-
 ```bash
-
 pip install torchcodec   # recommended
-
-\# OR
-
+# OR
 pip install decord
-
-\# OR
-
+# OR
 pip install opencv-python  # fallback
-
 ```
 
+---
 
+## Latent Space Diagnosis (Run This First)
 
-\---
+Before running Stage 1, always run the latent space diagnostic tool on your own video data. This step takes less than 5 minutes and can save hours of failed training.
 
+### What it checks
 
+`test_vjepa2_latent.py` verifies three things:
 
-\## Quick Start
+| Check | Why It Matters |
+|---|---|
+| z vector statistics (mean, std, norm) | Determines if AIM quantizer parameters need adjustment |
+| `temporal_pool` divisibility | Confirms N_tokens is divisible by num_frames |
+| Per-video consistency | Detects preprocessing issues before training |
 
-
-
-\### Step 1: Verify the pipeline (no model or video needed)
-
-
+### Run the diagnostic
 
 ```bash
+# Local
+python test_vjepa2_latent.py \
+    --video_root ./data/kinetics_mini/val \
+    --device cuda
 
-cd aim\_bridge
-
-python stage1\_diagnosis.py --run\_mock
-
+# Kaggle / Colab
+!python test_vjepa2_latent.py \
+    --video_root ./data/kinetics_mini/val \
+    --device cuda
 ```
 
+### Interpreting the output
 
+```
+z norm (mean per token): 97.7   ← important number
+```
+
+| z norm | Meaning | Action |
+|---|---|---|
+| 1–10 | Normal range | No adjustment needed |
+| 10–150 | High but acceptable | Remove first L2 normalize in quantizer |
+| > 150 | Very high | Add stronger normalization |
+
+**If your `z norm` is above 10**, edit `Stage1AIMQuantizer.encode()` in `stage1_diagnosis.py`:
+
+```python
+# Remove this line:
+z_norm = F.normalize(z_frame, dim=-1)
+
+# Keep only:
+z_proj = self.projection(z_frame)        # LayerNorm handles normalization
+z_proj_norm = F.normalize(z_proj, dim=-1)
+```
+
+This is the most common cause of `Loss=0.0000` and `Active=3%` during quantizer training.
+
+### Using your own video data
+
+The diagnostic works with any video dataset, not just Kinetics-mini. Point `--video_root` at any directory containing class subdirectories with `.mp4` files:
+
+```
+your_data/
+├── class_A/
+│   ├── video1.mp4
+│   └── video2.mp4
+└── class_B/
+    ├── video3.mp4
+    └── video4.mp4
+```
+
+```bash
+python test_vjepa2_latent.py --video_root ./your_data --device cuda
+```
+
+---
+
+## Quick Start
+
+### Step 0: Run latent space diagnostic (required)
+
+```bash
+python test_vjepa2_latent.py \
+    --video_root ./data/kinetics_mini/val \
+    --device cuda
+```
+
+Check the output for `z norm` and adjust quantizer parameters if needed (see above).
+
+### Step 1: Verify the pipeline (no model or video needed)
+
+```bash
+cd aim_bridge
+python stage1_diagnosis.py --run_mock
+```
 
 Expected output: all 4 criteria pass (H1, H2-chi2, H2-MI, codebook).
 
-
-
-\### Step 2: Download test videos
-
-
+### Step 2: Download test videos
 
 ```python
-
-from huggingface\_hub import snapshot\_download
-
-snapshot\_download(
-
-&#x20;   repo\_id="nateraw/kinetics-mini",
-
-&#x20;   repo\_type="dataset",
-
-&#x20;   local\_dir="./data/kinetics\_mini",
-
-&#x20;   allow\_patterns="val/\*/\*.mp4"
-
+from huggingface_hub import snapshot_download
+snapshot_download(
+    repo_id="nateraw/kinetics-mini",
+    repo_type="dataset",
+    local_dir="./data/kinetics_mini",
+    allow_patterns="val/*/*.mp4"
 )
-
 ```
 
-
-
-\### Step 3: Run Stage 1 diagnosis
-
-
+### Step 3: Run Stage 1 diagnosis
 
 ```bash
+# Using ViT-L (default, recommended)
+python stage1_diagnosis.py --run_with_kinetics \
+    --video_root ../data/kinetics_mini/val \
+    --encoder_embed_dim 1024 \
+    --device cpu \
+    --output_dir ../stage1_results
 
-\# Using ViT-L (default, recommended)
-
-python stage1\_diagnosis.py --run\_with\_kinetics \\
-
-&#x20;   --video\_root ../data/kinetics\_mini/val \\
-
-&#x20;   --encoder\_embed\_dim 1024 \\
-
-&#x20;   --device cpu \\
-
-&#x20;   --output\_dir ../stage1\_results
-
-
-
-\# Using ViT-g (if downloaded)
-
-python stage1\_diagnosis.py --run\_with\_kinetics \\
-
-&#x20;   --video\_root ../data/kinetics\_mini/val \\
-
-&#x20;   --encoder\_embed\_dim 1408 \\
-
-&#x20;   --device cpu \\
-
-&#x20;   --output\_dir ../stage1\_results
-
+# Using ViT-g (if downloaded)
+python stage1_diagnosis.py --run_with_kinetics \
+    --video_root ../data/kinetics_mini/val \
+    --encoder_embed_dim 1408 \
+    --device cpu \
+    --output_dir ../stage1_results
 ```
 
-
-
-\### Step 4: Analyze the dictionary
-
-
+### Step 4: Analyze the dictionary
 
 ```bash
-
 cd ../aim
-
-python analyze\_aim.py \\
-
-&#x20;   --dict\_path ../stage1\_results/aim\_dictionary\_stage1.json \\
-
-&#x20;   --K\_val 64 \\
-
-&#x20;   --top\_N\_aim 10
-
+python analyze_aim.py \
+    --dict_path ../stage1_results/aim_dictionary_stage1.json \
+    --K_val 64 \
+    --top_N_aim 10
 ```
 
+---
 
+## Outputs
 
-\---
-
-
-
-\## Outputs
-
-
-
-After Stage 1 completes, results are saved to `stage1\_results/`:
-
-
+After Stage 1 completes, results are saved to `stage1_results/`:
 
 ```
-
-stage1\_results/
-
-├── stage1\_report.json              # Pass/fail for all 4 criteria
-
-├── aim\_dictionary\_stage1.json      # Initial AIM symbol dictionary
-
+stage1_results/
+├── stage1_report.json              # Pass/fail for all 4 criteria
+├── aim_dictionary_stage1.json      # Initial AIM symbol dictionary
 └── figures/
-
-&#x20;   ├── stage\_a\_training.png        # Quantizer training curve
-
-&#x20;   ├── intervention\_grasp\_angle.png    # JSD heatmap + symbol distributions
-
-&#x20;   ├── intervention\_object\_geometry.png
-
-&#x20;   ├── intervention\_motion\_speed.png
-
-&#x20;   └── stage1\_summary.png          # Overall pass/fail summary
-
+    ├── stage_a_training.png        # Quantizer training curve
+    ├── intervention_grasp_angle.png    # JSD heatmap + symbol distributions
+    ├── intervention_object_geometry.png
+    ├── intervention_motion_speed.png
+    └── stage1_summary.png          # Overall pass/fail summary
 ```
 
+---
 
+## Related Work
 
-\---
+- **V-JEPA 2**: [Self-Supervised Video Models Enable Understanding, Prediction and Planning](https://arxiv.org/abs/2506.09985) — Assran et al., Meta FAIR, 2025
+- **AIM Framework**: [AI Mother Tongue: Self-Emergent Communication in MARL via Endogenous Symbol Systems](https://arxiv.org/abs/2507.10566) — Liu, 2025
+- **DRCB**: Dynamic Representational Circuit Breaker for steganographic collusion detection in MARL (companion paper)
 
+---
 
+## Notes
 
-\## Related Work
+- This project does **not** modify V-JEPA 2 weights in Stage 1. The encoder is completely frozen.
+- **Always run `test_vjepa2_latent.py` before Stage 1.** V-JEPA 2's latent vectors have high norm (~97 for ViT-L), which can cause quantizer collapse if not handled correctly. The diagnostic tool detects this automatically.
+- The AIM quantizer trained in Stage 1 operates on frozen features and takes approximately 1–3 hours on CPU (ViT-L) or 30–60 minutes on GPU.
+- Model checkpoint files (`.pt`, `.pth`) are excluded from version control via `.gitignore`.
+- Stage 1 uses [Kinetics-mini](https://huggingface.co/datasets/nateraw/kinetics-mini) as a proof-of-concept dataset. Limitations of this dataset (confounding variables across action classes) are acknowledged; controlled physical experiments are planned as future work.
 
+---
 
-
-\- \*\*V-JEPA 2\*\*: \[Self-Supervised Video Models Enable Understanding, Prediction and Planning](https://arxiv.org/abs/2506.09985) — Assran et al., Meta FAIR, 2025
-
-\- \*\*AIM Framework\*\*: \[AI Mother Tongue: Self-Emergent Communication in MARL via Endogenous Symbol Systems](https://arxiv.org/abs/2507.10566) — Liu, 2025
-
-\- \*\*DRCB\*\*: Dynamic Representational Circuit Breaker for steganographic collusion detection in MARL (companion paper)
-
-
-
-\---
-
-
-
-\## Notes
-
-
-
-\- This project does \*\*not\*\* modify V-JEPA 2 weights in Stage 1. The encoder is completely frozen.
-
-\- The AIM quantizer trained in Stage 1 operates on frozen features and takes approximately 1–3 hours on CPU (ViT-L).
-
-\- Model checkpoint files (`.pt`, `.pth`) are excluded from version control via `.gitignore`.
-
-\- Stage 1 uses \[Kinetics-mini](https://huggingface.co/datasets/nateraw/kinetics-mini) as a proof-of-concept dataset. Limitations of this dataset (confounding variables across action classes) are acknowledged; controlled physical experiments are planned as future work.
-
-
-
-\---
-
-
-
-\## License
-
-
+## License
 
 MIT
-

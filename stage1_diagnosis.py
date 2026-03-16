@@ -122,13 +122,13 @@ class Stage1AIMQuantizer(nn.Module):
         """
         B, D = z_frame.shape
 
-        # L2 Normalization（在投影前做，穩定高維輸入）
-        # 注意：在 temporal pooling 之後才做，保留幀間相對尺度
-        z_norm = F.normalize(z_frame, dim=-1)
 
-        # 投影到低維空間
-        z_proj = self.projection(z_norm)           # [B, projection_dim]
-        z_proj_norm = F.normalize(z_proj, dim=-1)  # 投影後再 normalize
+
+
+        # 修改後：不做 L2 normalize，讓 LayerNorm 處理數值範圍
+        # projection 裡已經有 LayerNorm，直接投影
+        z_proj = self.projection(z_frame)           # LayerNorm 在 projection 裡
+        z_proj_norm = F.normalize(z_proj, dim=-1)   # 只在投影後 normalize 一次
 
         # 計算與 codebook 的距離
         dist = (

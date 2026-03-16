@@ -29,6 +29,26 @@ If the resulting symbols systematically vary with physical conditions (object ge
 
 This is what we mean by interpretability: not pixel reconstruction, not natural language explanation, but a statistically auditable symbolic record of the model's latent state transitions.
 
+### Why the encoder must be frozen in Stage 1
+
+This is not merely a technical convenience — it is a scientific requirement.
+
+Stage 1 asks a precise question: **can AIM's symbolization mechanism read knowledge that V-JEPA 2 has already learned?** To answer this cleanly, all confounding variables must be eliminated. Freezing the encoder achieves this:
+
+```
+If encoder is NOT frozen:
+  Experiment fails → unclear whether AIM failed, or the encoder was disrupted
+  Experiment succeeds → unclear whether AIM succeeded, or the encoder adapted to help
+
+If encoder IS frozen:
+  Experiment fails → AIM cannot read this latent space
+  Experiment succeeds → AIM successfully read knowledge V-JEPA 2 already possessed
+```
+
+Freezing the encoder also has a practical consequence: because a frozen encoder always produces identical outputs for the same input, all z-vectors can be pre-computed once and reused throughout training. This is both faster and more sample-efficient — 50 videos × 16 frames = 800 training samples instead of 50.
+
+Stage 3 will unfreeze the encoder, but only after Stage 1 and 2 have established that AIM and V-JEPA 2 are architecturally compatible. At that point, joint training becomes meaningful — without that foundation, it would be impossible to distinguish genuine co-learning from mutual accommodation.
+
 ---
 
 ## Project Structure
@@ -73,14 +93,22 @@ project_root/
 
 ## Four-Stage Research Roadmap
 
-This project follows a progressive integration strategy. Each stage has explicit pass/fail criteria before proceeding.
+This project follows a progressive integration strategy. Each stage has explicit pass/fail criteria before proceeding. The central design principle is **progressive unfreezing**: the encoder starts completely frozen and is only released once the symbolization mechanism has proven itself on stable features.
 
 | Stage | Goal | V-JEPA 2 | Status |
 |---|---|---|---|
-| **Stage 1** | Verify AIM symbols capture semantic differences | Frozen (no training) | ✅ In progress |
-| Stage 2 | Quantizer warm-up with stable codebook | Frozen | Planned |
-| Stage 3 | Joint training with symmetric quantization | Fine-tuned | Future work |
-| Stage 4 | Action-conditioned symbolic world model | Fine-tuned | Future work |
+| **Stage 1** | Verify AIM symbols capture semantic differences | **Frozen** — encoder untouched | ✅ In progress |
+| Stage 2 | Quantizer warm-up with stable codebook | **Frozen** — encoder untouched | Planned |
+| Stage 3 | Joint training with symmetric quantization | **Unfrozen** — encoder fine-tuned | Future work |
+| Stage 4 | Action-conditioned symbolic world model | **Unfrozen** — encoder fine-tuned | Future work |
+
+### Why this progression matters
+
+**Stages 1–2 (encoder frozen):** The encoder's weights never change. Every input produces exactly the same output every time. This makes the experiment scientifically clean — any symbol patterns that emerge are entirely attributable to what V-JEPA 2 already knows, not to any adaptation that happened during our experiment. It also allows z-vectors to be pre-computed once and reused, making training both faster and more sample-efficient.
+
+**Stages 3–4 (encoder unfrozen):** Joint training begins only after Stages 1 and 2 have confirmed architectural compatibility. Without that foundation, it would be impossible to tell whether joint training produced genuine co-learning or merely mutual accommodation — the two models adjusting to each other without either contributing meaningful knowledge.
+
+The frozen-then-unfreeze strategy is the same logic used in transfer learning: first verify that the pre-trained representation is useful as-is, then fine-tune once you are confident the integration is sound.
 
 **Stage 1 is the focus of this repository.** The encoder is completely frozen — no V-JEPA 2 weights are modified. Only the lightweight AIM quantizer is trained.
 

@@ -232,12 +232,14 @@ def _apply_vjepa2_preprocessor(
 
 
     except Exception as e:
-        log.warning(f"Preprocessor failed ({e}), applying manual normalization")
+        log.debug(f"Preprocessor failed ({e}), applying manual normalization")
         # 手動套用 ImageNet 標準化（V-JEPA 2 預訓練使用的標準）
         mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1, 1)
         std  = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1, 1)
         frames = (frames - mean) / std   # frames 已經是 [0,1] 範圍
         return frames.to(device)
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════

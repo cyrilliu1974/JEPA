@@ -1,0 +1,29 @@
+# ── Core Deep Learning ──────────────────────────────────────────────
+torch>=2.0.0
+torchvision>=0.15.0
+
+# ── HuggingFace (V-JEPA 2 model loading) ────────────────────────────
+transformers>=4.40.0
+huggingface_hub>=0.20.0
+
+# ── Video Decoding (install at least one) ───────────────────────────
+# Option 1: torchcodec (recommended, Meta official)
+# torchcodec>=0.1.0
+# Option 2: decord (widely supported)
+# decord>=0.6.0
+# Option 3: opencv (fallback)
+opencv-python>=4.8.0
+
+# ── Scientific Computing ────────────────────────────────────────────
+numpy>=1.24.0
+scipy>=1.10.0
+
+# ── Visualization ───────────────────────────────────────────────────
+matplotlib>=3.7.0
+
+# ── Dataset Download ────────────────────────────────────────────────
+datasets>=2.14.0
+
+# ── Utilities ───────────────────────────────────────────────────────
+einops>=0.6.0
+tqdm>=4.65.0

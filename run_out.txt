@@ -1,0 +1,11 @@
+[12:38:52] INFO ==================================================
+[12:38:52] INFO Running with real encoder + Kinetics-mini videos
+[12:38:52] INFO ==================================================
+[12:38:53] INFO Video decoders: torchvision \u2705, opencv \u2705
+[12:38:53] INFO transformers \u2705 (4.47.1)
+[12:38:53] INFO scipy \u2705 (1.13.0)
+[12:38:53] INFO \u2705 Environment check passed
+[12:38:53] INFO Loading V-JEPA 2 encoder...
+[12:38:53] WARNING HuggingFace load failed (cannot import name 'AutoVideoProcessor' from 'transformers' (C:\Users\cyril\anaconda3\Lib\site-packages\transformers\__init__.py)), trying local checkpoint...
+[12:38:53] ERROR No encoder available. Download with:
+[12:38:53] ERROR   wget https://dl.fbaipublicfiles.com/vjepa2/vitg.pt -O checkpoints/vjepa2_vitg.pt

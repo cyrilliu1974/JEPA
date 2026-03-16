@@ -1,0 +1,66 @@
+# ── Model Checkpoints ──────────────────────────────────────────────
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# ── Experiment Outputs ──────────────────────────────────────────────
+stage1_results/
+stage2_results/
+stage3_results/
+stage4_results/
+figures/
+*.json
+!aim/aim_dictionary_json.py
+
+# ── Video Data ──────────────────────────────────────────────────────
+data/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+
+# ── HuggingFace Cache ───────────────────────────────────────────────
+.cache/
+huggingface/
+
+# ── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ── Virtual Environments ────────────────────────────────────────────
+venv/
+env/
+.env
+.venv
+ENV/
+
+# ── IDE ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Logs ────────────────────────────────────────────────────────────
+*.log
+logs/
+runs/
+
+# ── Jupyter ─────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Temp ────────────────────────────────────────────────────────────
+tmp/
+temp/
+temp_result_*.json

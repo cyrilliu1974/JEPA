@@ -155,15 +155,18 @@ pip install opencv-python  # fallback
 
 Before running Stage 1, always run the latent space diagnostic tool on your own video data. This step takes less than 5 minutes and can save hours of failed training.
 
+The code logic itself is fixed and stable. However, **different datasets will produce different latent space characteristics**, and some of these characteristics can cause training to fail silently. The diagnostic tool detects these issues before you commit to a full run.
+
 ### What it checks
 
-`test_vjepa2_latent.py` verifies three things:
+`test_vjepa2_latent.py` verifies four things:
 
 | Check | Why It Matters |
 |---|---|
-| z vector statistics (mean, std, norm) | Determines if AIM quantizer parameters need adjustment |
-| `temporal_pool` divisibility | Confirms N_tokens is divisible by num_frames |
-| Per-video consistency | Detects preprocessing issues before training |
+| z vector norm | High norm (>10) causes `Loss=0` and codebook collapse |
+| N_tokens divisibility | Must be divisible by `num_frames` or `temporal_pool` will crash |
+| Per-class z statistics | Low inter-class variance means AIM symbols cannot distinguish conditions |
+| Per-video consistency | Detects random augmentation that would break H1 stability |
 
 ### Run the diagnostic
 
@@ -179,34 +182,101 @@ python test_vjepa2_latent.py \
     --device cuda
 ```
 
-### Interpreting the output
+### Data-dependent issues and how to handle them
+
+These issues are **not bugs in the code**. They depend on your dataset, model size, and video resolution. You may encounter them when switching to a new dataset.
+
+---
+
+**Issue 1: Loss drops to 0 immediately**
 
 ```
-z norm (mean per token): 97.7   ← important number
+Step 0   | Loss=0.0013
+Step 100 | Loss=0.0000   ← stop here
 ```
 
-| z norm | Meaning | Action |
-|---|---|---|
-| 1–10 | Normal range | No adjustment needed |
-| 10–150 | High but acceptable | Remove first L2 normalize in quantizer |
-| > 150 | Very high | Add stronger normalization |
+Cause: The z norm is too high. V-JEPA 2's ViT-L outputs vectors with norm ≈ 97. After two rounds of L2 normalization inside the quantizer, all vectors collapse to the same direction and the codebook cannot distinguish anything.
 
-**If your `z norm` is above 10**, edit `Stage1AIMQuantizer.encode()` in `stage1_diagnosis.py`:
+Check: Look at the `z norm` value in the diagnostic output.
+
+| z norm | Action |
+|---|---|
+| 1–10 | No adjustment needed |
+| 10–150 | Remove the first L2 normalize in `Stage1AIMQuantizer.encode()` |
+| > 150 | Add stronger normalization before the projection layer |
+
+Fix (remove first L2 normalize in `stage1_diagnosis.py`):
 
 ```python
 # Remove this line:
 z_norm = F.normalize(z_frame, dim=-1)
 
 # Keep only:
-z_proj = self.projection(z_frame)        # LayerNorm handles normalization
-z_proj_norm = F.normalize(z_proj, dim=-1)
+z_proj = self.projection(z_frame)         # LayerNorm inside projection handles scale
+z_proj_norm = F.normalize(z_proj, dim=-1) # normalize only after projection
 ```
 
-This is the most common cause of `Loss=0.0000` and `Active=3%` during quantizer training.
+---
+
+**Issue 2: N_tokens is not divisible by num_frames**
+
+```
+AssertionError: N_tokens (1540) must be divisible by num_frames (16)
+```
+
+Cause: Different video resolutions produce different N_tokens. Kinetics-mini at 360×480 gives N_tokens=1568 (divisible by 16). Your videos at a different resolution may not.
+
+Check: The diagnostic reports `N_tokens % num_frames == 0` directly.
+
+Fix: Adjust `--num_frames` to a value that divides your N_tokens, or resize videos to 224×224 before processing.
+
+---
+
+**Issue 3: Codebook collapse (Active Ratio stays at 3%)**
+
+```
+Step 500 | Active=3%   ← stop if this does not improve
+Step 200 | ↻ Reset 62 dead codes at step 200  ← reset happening but not helping
+```
+
+Cause: Your video classes are too similar in latent space. If all classes have nearly identical z vector directions (cosine similarity > 0.99), the quantizer cannot find meaningful cluster boundaries regardless of training duration.
+
+Check: Compare `z mean` across classes in the diagnostic output. If all classes show nearly identical statistics, the dataset may not have sufficient latent-space diversity for AIM symbolization.
+
+Fix options:
+- Choose more semantically distinct video classes
+- Increase `codebook_size` to a smaller number (e.g., 16 or 32) to reduce pressure on the codebook
+- Increase `warmup_iterations` to give the codebook more time to spread out
+
+---
+
+**Issue 4: Random baseline MI is not close to 0**
+
+```
+Random baseline MI: 0.45   ← should be < 0.1
+```
+
+Cause: Your dataset has a systematic bias unrelated to the semantic variable you are testing (e.g., all videos of one class happen to be brighter, or filmed from a fixed angle). The codebook learned this bias instead of semantics.
+
+Fix: Check whether your conditions differ in confounding factors (brightness, camera angle, background). Consider rebalancing the dataset or normalizing video statistics before processing.
+
+---
+
+**Issue 5: H1 stability below 95%**
+
+```
+H1 Result: 0.72   ← stop here
+```
+
+Cause: Something in your preprocessing pipeline is introducing randomness. This could be random frame sampling, random crop, color jitter, or any other stochastic augmentation applied during inference.
+
+Fix: Ensure `encoder.eval()` is called and all augmentation is disabled before running H1. The code already handles this, but custom video loading pipelines may reintroduce randomness.
+
+---
 
 ### Using your own video data
 
-The diagnostic works with any video dataset, not just Kinetics-mini. Point `--video_root` at any directory containing class subdirectories with `.mp4` files:
+The diagnostic works with any video dataset. Point `--video_root` at any directory with class subdirectories containing `.mp4` files:
 
 ```
 your_data/
@@ -221,6 +291,8 @@ your_data/
 ```bash
 python test_vjepa2_latent.py --video_root ./your_data --device cuda
 ```
+
+Run this every time you switch to a new dataset or a different V-JEPA 2 model size. The latent space characteristics vary across ViT-L, ViT-H, and ViT-g.
 
 ---
 
@@ -316,7 +388,8 @@ stage1_results/
 ## Notes
 
 - This project does **not** modify V-JEPA 2 weights in Stage 1. The encoder is completely frozen.
-- **Always run `test_vjepa2_latent.py` before Stage 1.** V-JEPA 2's latent vectors have high norm (~97 for ViT-L), which can cause quantizer collapse if not handled correctly. The diagnostic tool detects this automatically.
+- **Always run `test_vjepa2_latent.py` before Stage 1**, especially when using a new dataset or a different model size. Latent space characteristics vary across ViT-L, ViT-H, and ViT-g, and can cause silent training failures if not checked first.
+- The code logic is fixed and stable. Issues that arise when switching datasets are data-dependent, not code bugs. See the **Latent Space Diagnosis** section for a complete guide.
 - The AIM quantizer trained in Stage 1 operates on frozen features and takes approximately 1–3 hours on CPU (ViT-L) or 30–60 minutes on GPU.
 - Model checkpoint files (`.pt`, `.pth`) are excluded from version control via `.gitignore`.
 - Stage 1 uses [Kinetics-mini](https://huggingface.co/datasets/nateraw/kinetics-mini) as a proof-of-concept dataset. Limitations of this dataset (confounding variables across action classes) are acknowledged; controlled physical experiments are planned as future work.

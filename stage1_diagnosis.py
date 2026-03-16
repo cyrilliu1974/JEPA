@@ -215,6 +215,33 @@ class Stage1AIMQuantizer(nn.Module):
             self.ema_embed_sum[dead] = new_codes.clone()
         return int(n_dead)
 
+    @torch.no_grad()
+    def initialize_from_data(self, z_vectors: torch.Tensor):
+        """
+        用真實 z 向量初始化 codebook（k-means 初始化）。
+        解決隨機初始化導致的立即 collapse 問題。
+
+        z_vectors: [N, D]，已經過 projection 的向量
+        """
+        N, D = z_vectors.shape
+        K = self.codebook_size
+
+        if N < K:
+            # 樣本不足：重複取樣
+            repeat = (K // N) + 1
+            z_vectors = z_vectors.repeat(repeat, 1)[:K]
+            indices = torch.randperm(K)
+        else:
+            # 隨機取 K 個向量作為初始 codebook
+            indices = torch.randperm(N)[:K]
+
+        init_codes = F.normalize(z_vectors[indices], dim=-1).to(self.codebook.device)
+        self.codebook.copy_(init_codes)
+        self.ema_embed_sum.copy_(init_codes)
+        self.ema_cluster_size.fill_(1.0)  # 避免除以零
+        self.usage_counter.zero_()
+        log.info(f"  Codebook initialized from {N} real z-vectors")
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # Temporal Pooling 工具函數
@@ -426,6 +453,19 @@ class Stage1Diagnostician:
 
         # ── Step 1：預計算所有 z 向量 ─────────────────────────────────
         all_z_tensor = self._precompute_z_vectors(video_loader)
+
+        # ── 用真實資料初始化 codebook ─────────────────────────────
+        log.info("  Initializing codebook from real z-vectors...")
+        with torch.no_grad():
+            # 先過一次 projection，取得真實的投影後向量
+            # 隨機抽樣 512 個樣本來初始化，如果樣本不足則全用
+            n_sample = min(512, len(all_z_tensor))
+            sample_idx = torch.randperm(len(all_z_tensor))[:n_sample]
+            sample = all_z_tensor[sample_idx].to(self.device)
+            z_proj = self.quantizer.projection(sample)
+            z_proj_norm = F.normalize(z_proj, dim=-1)
+        self.quantizer.initialize_from_data(z_proj_norm)
+        log.info("  ✅ Codebook initialization complete")
 
         # 建立 z 向量的 DataLoader（直接訓練量化器，不再跑 encoder）
         from torch.utils.data import TensorDataset, DataLoader as _DL

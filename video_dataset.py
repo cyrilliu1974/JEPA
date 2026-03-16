@@ -84,10 +84,19 @@ def _load_video_frames(
 
         # 均勻採樣 num_frames 幀
         indices = torch.linspace(0, total - 1, num_frames).long().tolist()
-        frames = decoder.get_frames_at(indices=indices).data  # [T, H, W, C]
+        frames_data = decoder.get_frames_at(indices=indices)
+        
+        # 處理不同版本的 torchcodec (可能是 FrameBatch 物件或直接是 tensor)
+        if hasattr(frames_data, 'data'):
+            frames = frames_data.data
+        else:
+            frames = frames_data
 
         # 轉換格式
-        frames = torch.from_numpy(frames).float() / 255.0  # [T, H, W, C]
+        if not isinstance(frames, torch.Tensor):
+            frames = torch.from_numpy(frames)
+        
+        frames = frames.float() / 255.0  # [T, H, W, C]
         frames = frames.permute(3, 0, 1, 2)                # [C, T, H, W]
         frames = F.interpolate(
             frames.unsqueeze(0),

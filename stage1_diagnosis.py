@@ -361,6 +361,37 @@ class Stage1Diagnostician:
     # Task A：量化器訓練（Stage A warm-up）
     # ──────────────────────────────────────────────────────────────────
 
+    def _precompute_z_vectors(self, video_loader) -> torch.Tensor:
+        """
+        預先計算所有影片的 z 向量並存入記憶體。
+
+        核心思路：
+          50 部影片 × 16 幀 = 800 個 frame-level 向量
+          比直接用 video_loader（每 epoch 只有 3-12 個 batch）
+          提供更密集的 EMA 更新信號。
+
+        Returns: [N, D] tensor，N = 總幀數，D = encoder_embed_dim
+        """
+        log.info("  Pre-computing z vectors for all videos...")
+        all_z = []
+
+        with torch.no_grad():
+            for video_batch, _ in video_loader:
+                video_batch = video_batch.to(self.device)
+                z = self._encode(video_batch)              # [B, N_tokens, D]
+                z_frames = temporal_pool(z, self.num_frames)  # [B, T, D]
+                B, T, D = z_frames.shape
+                # 展開成 [B×T, D]
+                all_z.append(z_frames.reshape(B * T, D).cpu())
+
+        all_z_tensor = torch.cat(all_z, dim=0)  # [N, D]
+        n_videos = len(all_z_tensor) // self.num_frames
+        log.info(
+            f"  Pre-computed {len(all_z_tensor)} frame vectors "
+            f"({n_videos} videos × {self.num_frames} frames)"
+        )
+        return all_z_tensor
+
     def train_quantizer(
         self,
         video_loader,                   # DataLoader，輸出 (video_tensor, label)
@@ -368,18 +399,50 @@ class Stage1Diagnostician:
         lr: float = 1e-3,
         perplexity_target_ratio: float = 0.4,  # 健康閾值：log(K) 的 40%
         dead_code_reset_interval: int = 200,
+        z_batch_size: int = 64,         # 預計算 z 向量的 batch size
     ):
         """
         Stage A：只訓練量化器，encoder 完全凍結。
 
-        收斂標準：
-        - Perplexity / log(K) > 0.4（健康碼本）
-        - 連續 200 iteration loss 不再下降
-        """
-        log.info(f"=== Stage A: Quantizer Warm-up ===")
-        log.info(f"  Target: {warmup_iterations} iterations")
-        log.info(f"  Perplexity health threshold: {perplexity_target_ratio:.0%} of log({self.codebook_size})")
+        訓練策略：
+          先把所有影片的 z 向量預計算並存入記憶體，
+          再用這些 z 向量直接訓練量化器。
 
+          好處：
+          - 50 部影片 × 16 幀 = 800 個訓練樣本（不是 50 個）
+          - z_batch_size=64 → 每 epoch 12 個 batch，EMA 更新信號充足
+          - 不需要每步都跑 encoder，訓練速度快很多
+
+        收斂標準：
+          - Perplexity / log(K) > 0.4（健康碼本）
+          - 連續 200 iteration loss 不再下降
+        """
+        log.info("=== Stage A: Quantizer Warm-up ===")
+        log.info(f"  Target: {warmup_iterations} iterations")
+        log.info(
+            f"  Perplexity health threshold: "
+            f"{perplexity_target_ratio:.0%} of log({self.codebook_size})"
+        )
+
+        # ── Step 1：預計算所有 z 向量 ─────────────────────────────────
+        all_z_tensor = self._precompute_z_vectors(video_loader)
+
+        # 建立 z 向量的 DataLoader（直接訓練量化器，不再跑 encoder）
+        from torch.utils.data import TensorDataset, DataLoader as _DL
+        z_dataset = TensorDataset(all_z_tensor)
+        z_loader  = _DL(
+            z_dataset,
+            batch_size=z_batch_size,
+            shuffle=True,
+            drop_last=False,
+        )
+        log.info(
+            f"  Z-vector loader: {len(all_z_tensor)} samples, "
+            f"batch_size={z_batch_size}, "
+            f"{len(z_loader)} batches per epoch"
+        )
+
+        # ── Step 2：用 z 向量訓練量化器 ──────────────────────────────
         optimizer = optim.Adam(self.quantizer.parameters(), lr=lr)
         scheduler = optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=warmup_iterations, eta_min=lr * 0.1
@@ -390,65 +453,41 @@ class Stage1Diagnostician:
 
         loss_history = []
         perplexity_history = []
-        collected_z_for_reset = []
 
         self.quantizer.train()
         step = 0
         converged = False
 
         while step < warmup_iterations and not converged:
-            for video_batch, _ in video_loader:
+            for (z_batch,) in z_loader:
                 if step >= warmup_iterations:
                     break
 
-                video_batch = video_batch.to(self.device)
+                z_batch = z_batch.to(self.device)  # [B, D]
 
-                # Encoder forward（no_grad）
-                with torch.no_grad():
-                    z = self._encode(video_batch)                     # [B, N_tokens, D]
-                    z_frames = temporal_pool(z, self.num_frames)      # [B, T, D]
+                # 直接量化 z 向量（不需要 temporal pool，已經是 frame-level）
+                _, _, loss = self.quantizer.encode(z_batch)
 
-                # 對每一幀量化
-                total_loss = torch.tensor(0.0, device=self.device)
-                B, T, D = z_frames.shape
-                batch_z_list = []
-
-                for t in range(T):
-                    z_t = z_frames[:, t, :]   # [B, D]
-                    batch_z_list.append(z_t)
-                    _, _, loss_t = self.quantizer.encode(z_t)
-                    total_loss += loss_t
-
-                total_loss /= T
                 optimizer.zero_grad()
-                total_loss.backward()
+                loss.backward()
                 optimizer.step()
                 scheduler.step()
-
-                # 收集用於死碼重置的向量
-                collected_z_for_reset.append(
-                    torch.cat(batch_z_list, dim=0).detach()
-                )
-                if len(collected_z_for_reset) > 10:
-                    collected_z_for_reset.pop(0)
 
                 # 監控
                 perp = self.quantizer.compute_perplexity()
                 active = self.quantizer.active_code_ratio()
-                loss_history.append(total_loss.item())
+                loss_history.append(loss.item())
                 perplexity_history.append(perp)
 
                 if step % 100 == 0:
                     log.info(
-                        f"  Step {step:4d} | Loss={total_loss.item():.4f} | "
+                        f"  Step {step:4d} | Loss={loss.item():.4f} | "
                         f"Perplexity={perp:.2f}/{max_perplexity:.2f} "
                         f"({perp/max_perplexity:.0%}) | "
                         f"Active={active:.0%}"
                     )
 
                 # ── Early Detection：Step 50 檢查 Perplexity 趨勢 ──────
-                # 如果 Perplexity 從 Step 0 到 Step 50 是下降的，
-                # 代表 EMA collapse 正在發生，繼續跑沒有意義
                 if step == 50:
                     perp_0  = perplexity_history[0]
                     perp_50 = perplexity_history[49]
@@ -457,8 +496,8 @@ class Stage1Diagnostician:
                             f"⚠️  Perplexity dropping "
                             f"({perp_0:.2f} → {perp_50:.2f}). "
                             f"EMA collapse likely. "
-                            f"Stop and retry with lower ema_decay / higher commitment_cost. "
-                            f"Suggested: --ema_decay 0.90 --commitment_cost 2.0"
+                            f"Stop and retry with: "
+                            f"--ema_decay 0.90 --commitment_cost 2.0"
                         )
                     else:
                         log.info(
@@ -466,21 +505,25 @@ class Stage1Diagnostician:
                             f"(Perplexity {perp_0:.2f} → {perp_50:.2f})"
                         )
 
-                # 死碼重置
+                # 死碼重置（直接用 z_batch，不需要另外收集）
                 if step % dead_code_reset_interval == 0 and step > 0:
-                    z_pool = torch.cat(collected_z_for_reset, dim=0)
-                    n_reset = self.quantizer.reset_dead_codes(z_pool)
+                    n_reset = self.quantizer.reset_dead_codes(
+                        z_batch.detach()
+                    )
                     if n_reset > 0:
-                        log.info(f"  ↻ Reset {n_reset} dead codes at step {step}")
+                        log.info(
+                            f"  ↻ Reset {n_reset} dead codes at step {step}"
+                        )
 
                 # 收斂判斷
                 if step >= 500 and perp >= health_threshold:
-                    recent_loss = np.mean(loss_history[-200:])
-                    older_loss = np.mean(loss_history[-400:-200])
+                    recent_loss  = np.mean(loss_history[-200:])
+                    older_loss   = np.mean(loss_history[-400:-200])
                     if abs(recent_loss - older_loss) / (older_loss + 1e-8) < 0.01:
                         log.info(
                             f"  ✅ Converged at step {step} "
-                            f"(perplexity={perp:.2f}, health={perp/max_perplexity:.0%})"
+                            f"(perplexity={perp:.2f}, "
+                            f"health={perp/max_perplexity:.0%})"
                         )
                         converged = True
                         break
@@ -489,22 +532,25 @@ class Stage1Diagnostician:
 
         # 切換到 eval 模式——H1 測試必須在 eval 模式下進行
         self.quantizer.eval()
-        final_perp = self.quantizer.compute_perplexity()
+        final_perp  = self.quantizer.compute_perplexity()
         final_active = self.quantizer.active_code_ratio()
 
-        log.info(f"\n  Final perplexity: {final_perp:.2f} / {max_perplexity:.2f} "
-                 f"({final_perp/max_perplexity:.0%})")
+        log.info(
+            f"\n  Final perplexity: {final_perp:.2f} / {max_perplexity:.2f} "
+            f"({final_perp/max_perplexity:.0%})"
+        )
         log.info(f"  Final active codes: {final_active:.0%}")
 
         self._plot_training_curve(loss_history, perplexity_history, max_perplexity)
 
         self.report["results"]["quantizer_training"] = {
-            "final_perplexity": round(final_perp, 3),
+            "final_perplexity":       round(final_perp, 3),
             "final_perplexity_ratio": round(final_perp / max_perplexity, 3),
-            "final_active_ratio": round(final_active, 3),
-            "total_steps": step,
-            "converged": converged,
-            "codebook_healthy": final_perp / max_perplexity >= perplexity_target_ratio,
+            "final_active_ratio":     round(final_active, 3),
+            "total_steps":            step,
+            "converged":              converged,
+            "codebook_healthy":       final_perp / max_perplexity >= perplexity_target_ratio,
+            "n_z_vectors":            len(all_z_tensor),
         }
 
         return converged

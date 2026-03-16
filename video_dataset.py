@@ -531,6 +531,111 @@ def build_train_loader(
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# 影片下載工具
+# ═══════════════════════════════════════════════════════════════════════
+
+# 支援的資料集來源
+DATASET_SOURCES = {
+    "kinetics-mini": {
+        "repo_id":      "nateraw/kinetics-mini",
+        "repo_type":    "dataset",
+        "pattern":      "val/*/*.mp4",
+        "local_subdir": "kinetics_mini",
+        "description":  "Kinetics-mini (~50 videos/class, ~5 classes)",
+    },
+    "kinetics": {
+        "repo_id":      "nateraw/kinetics",
+        "repo_type":    "dataset",
+        "pattern":      "val/*/*.mp4",
+        "local_subdir": "kinetics",
+        "description":  "Kinetics-400 full (~400 videos/class, 400 classes)",
+    },
+}
+
+
+def download_dataset(
+    dataset_name: str = "kinetics-mini",
+    local_dir: str = "./data",
+    classes: Optional[List[str]] = None,
+) -> str:
+    """
+    從 HuggingFace 下載影片資料集。
+
+    參數：
+        dataset_name : "kinetics-mini"（預設）或 "kinetics"
+        local_dir    : 本地儲存根目錄（預設 ./data）
+        classes      : 只下載指定類別，None 表示下載全部
+                       例如：["archery", "bowling", "flying_kite"]
+                       只在 dataset_name="kinetics" 時有效，
+                       kinetics-mini 太小，直接下載全部。
+
+    返回：
+        下載後的 val 目錄路徑（可直接傳給 --video_root）
+
+    使用範例：
+        # 下載 kinetics-mini（預設，約 50 部/類）
+        video_root = download_dataset()
+
+        # 下載完整 kinetics 的特定類別（約 400 部/類）
+        video_root = download_dataset(
+            dataset_name="kinetics",
+            classes=["archery", "bowling", "flying_kite", "high_jump", "marching"]
+        )
+    """
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError:
+        raise ImportError(
+            "huggingface_hub not installed. Run: pip install huggingface_hub"
+        )
+
+    if dataset_name not in DATASET_SOURCES:
+        raise ValueError(
+            f"Unknown dataset: '{dataset_name}'. "
+            f"Available: {list(DATASET_SOURCES.keys())}"
+        )
+
+    source = DATASET_SOURCES[dataset_name]
+    dest   = Path(local_dir) / source["local_subdir"]
+    val_dir = dest / "val"
+
+    # 如果已存在且有影片，跳過下載
+    if val_dir.exists():
+        existing = list(val_dir.rglob("*.mp4"))
+        if existing:
+            log.info(
+                f"Dataset already exists at {val_dir} "
+                f"({len(existing)} videos). Skipping download."
+            )
+            return str(val_dir)
+
+    # 決定下載的 patterns
+    if dataset_name == "kinetics-mini" or classes is None:
+        # kinetics-mini 直接下載全部
+        patterns = source["pattern"]
+    else:
+        # kinetics 只下載指定類別
+        patterns = [f"val/{c}/*.mp4" for c in classes]
+        log.info(f"Downloading classes: {classes}")
+
+    log.info(f"Downloading {source['description']}...")
+    log.info(f"  Source : {source['repo_id']}")
+    log.info(f"  Dest   : {dest}")
+    log.info(f"  Note   : This may take several minutes.")
+
+    snapshot_download(
+        repo_id=source["repo_id"],
+        repo_type=source["repo_type"],
+        local_dir=str(dest),
+        allow_patterns=patterns,
+    )
+
+    n_downloaded = len(list(val_dir.rglob("*.mp4")))
+    log.info(f"✅ Download complete: {n_downloaded} videos → {val_dir}")
+    return str(val_dir)
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # 環境檢查工具
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -616,31 +721,47 @@ if __name__ == "__main__":
     parser.add_argument("--video_root", type=str,
                        default="./data/kinetics_mini/val")
     parser.add_argument("--check_env", action="store_true")
+    parser.add_argument("--download", action="store_true",
+                       help="Download dataset from HuggingFace before scanning")
+    parser.add_argument("--dataset", type=str, default="kinetics-mini",
+                       choices=["kinetics-mini", "kinetics"],
+                       help="Dataset to download (default: kinetics-mini)")
+    parser.add_argument("--classes", type=str, nargs="+",
+                       default=["archery", "bowling", "flying_kite",
+                                "high_jump", "marching"],
+                       help="Classes to download (only used when --dataset kinetics)")
+    parser.add_argument("--data_dir", type=str, default="./data",
+                       help="Local directory to store downloaded data")
     args = parser.parse_args()
 
     if args.check_env:
         check_environment()
         sys.exit(0)
 
+    # 下載資料集
+    if args.download:
+        video_root = download_dataset(
+            dataset_name=args.dataset,
+            local_dir=args.data_dir,
+            classes=args.classes if args.dataset == "kinetics" else None,
+        )
+        args.video_root = video_root
+        log.info(f"Using video_root: {args.video_root}")
+
     # 掃描資料集並顯示統計
     if not Path(args.video_root).exists():
         log.error(f"Video root not found: {args.video_root}")
         log.info("Download with:")
-        log.info("  python -c \"")
-        log.info("  from huggingface_hub import snapshot_download")
-        log.info("  snapshot_download(")
-        log.info("      repo_id='nateraw/kinetics-mini',")
-        log.info("      repo_type='dataset',")
-        log.info("      local_dir='./data/kinetics_mini',")
-        log.info("      allow_patterns='val/*/*.mp4'")
-        log.info("  )\"")
+        log.info("  python video_dataset.py --download")
+        log.info("  python video_dataset.py --download --dataset kinetics "
+                 "--classes archery bowling flying_kite high_jump marching")
         sys.exit(1)
 
     check_environment()
 
     data = build_condition_dict(
         video_root=args.video_root,
-        processor=None,   # Mock 模式，不需要真實 processor
+        processor=None,
     )
 
     log.info("\n✅ Dataset ready for stage1_diagnosis.py")

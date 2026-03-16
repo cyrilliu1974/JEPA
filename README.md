@@ -374,34 +374,71 @@ python stage1_diagnosis.py --run_mock
 
 Expected output: all 4 criteria pass (H1, H2-chi2, H2-MI, codebook).
 
-### Step 2: Download test videos
+### Step 2: Download videos
 
-```python
-from huggingface_hub import snapshot_download
-snapshot_download(
-    repo_id="nateraw/kinetics-mini",
-    repo_type="dataset",
-    local_dir="./data/kinetics_mini",
-    allow_patterns="val/*/*.mp4"
-)
+Two dataset options are available. Choose based on your needs:
+
+**Option A: Kinetics-mini (default, ~50 videos/class)**
+
+Quick to download, sufficient for concept validation:
+
+```bash
+# Standalone download
+python video_dataset.py --download --dataset kinetics-mini
+
+# Or let stage1_diagnosis.py download automatically
+python stage1_diagnosis.py --run_with_kinetics \
+    --auto_download --dataset kinetics-mini \
+    --encoder_embed_dim 1024 --device cuda \
+    --output_dir ./stage1_results
 ```
+
+**Option B: Kinetics full (~400 videos/class)**
+
+For larger-scale experiments. Specify which classes to download to save time and disk space:
+
+```bash
+# Standalone download (5 classes only)
+python video_dataset.py --download --dataset kinetics \
+    --classes archery bowling flying_kite high_jump marching
+
+# Or let stage1_diagnosis.py download automatically
+python stage1_diagnosis.py --run_with_kinetics \
+    --auto_download --dataset kinetics \
+    --download_classes archery bowling flying_kite high_jump marching \
+    --max_per_class 100 \
+    --encoder_embed_dim 1024 --device cuda \
+    --output_dir ./stage1_results
+```
+
+Both options skip the download if the data already exists locally.
 
 ### Step 3: Run Stage 1 diagnosis
 
 ```bash
-# Using ViT-L (default, recommended)
+# Minimal (kinetics-mini, default parameters)
 python stage1_diagnosis.py --run_with_kinetics \
-    --video_root ../data/kinetics_mini/val \
+    --video_root ./data/kinetics_mini/val \
     --encoder_embed_dim 1024 \
-    --device cpu \
-    --output_dir ../stage1_results
+    --device cuda \
+    --output_dir ./stage1_results
 
-# Using ViT-g (if downloaded)
+# If Step 50 shows EMA collapse warning, add these:
 python stage1_diagnosis.py --run_with_kinetics \
-    --video_root ../data/kinetics_mini/val \
+    --video_root ./data/kinetics_mini/val \
+    --encoder_embed_dim 1024 \
+    --device cuda \
+    --ema_decay 0.90 \
+    --commitment_cost 2.0 \
+    --batch_size 16 \
+    --output_dir ./stage1_results
+
+# Using ViT-g (larger model, requires --encoder_embed_dim 1408)
+python stage1_diagnosis.py --run_with_kinetics \
+    --video_root ./data/kinetics_mini/val \
     --encoder_embed_dim 1408 \
-    --device cpu \
-    --output_dir ../stage1_results
+    --device cuda \
+    --output_dir ./stage1_results
 ```
 
 ### Step 4: Analyze the dictionary

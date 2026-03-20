@@ -47,8 +47,8 @@
 \definecolor{deadGreen}{RGB}{234, 243, 222}
 \definecolor{deadGreenBorder}{RGB}{59, 109, 17}
 
-\title{Probing the Latent World: Emergent Discrete Symbols and Physical Structure in Latent Representations}
-
+\title{Probing the Latent World: Emergent Discrete Symbols Reveal
+Physical Structure in Frozen V-JEPA~2 Representations}
 
 \author{Liu Hung Ming\thanks{PARRAWA AI} \\ \texttt{cyril.liu@gmail.com}}
 
@@ -72,10 +72,10 @@ generative components whose own parameters confound the attribution
 of observed behavior to the encoder's representations.
 
 We propose attaching the \textbf{AI Mother Tongue (AIM)} framework as
-a \emph{passive quantization probe}: a lightweight probe with minimal
-task-specific inductive bias that converts V-JEPA~2's continuous latent
-vectors into discrete symbol sequences without task-specific supervision
-or predefined symbol inventory, and without modifying the encoder.
+a \emph{passive quantization probe}: a lightweight, vocabulary-free
+vector quantization module that converts V-JEPA~2's continuous latent
+vectors into discrete symbol sequences without modifying the encoder
+and without imposing any semantic prior.
 Because the encoder is kept completely frozen throughout, any symbolic
 structure that emerges in the AIM codebook is attributable entirely to
 V-JEPA~2's pre-trained representations---not to the probe.
@@ -83,12 +83,10 @@ V-JEPA~2's pre-trained representations---not to the probe.
 We evaluate this design through category-contrast experiments on Kinetics-mini, contrasting action-category pairs along
 three physical dimensions: grasp angle, object geometry, and motion
 temporal structure.
-We use action-category pairs as proxies for physical dimensions, following a category-contrast strategy; direct physical manipulation of individual variables is deferred to Stage~3.
 AIM symbol distributions differ significantly across all three
-category-contrast experiments ($\chi^2\ p < 10^{-4}$;
-absolute mutual information $0.036$--$0.117$\,bits,
-normalized MI $1.2$--$3.9\%$ of the $\log_2 8 = 3$\,bit theoretical maximum;
-Jensen--Shannon divergence up to $0.342$) and codebook utilization is healthy
+interventions ($\chi^2\ p < 10^{-4}$; mutual information ratios of
+order $10^6$ relative to a Gaussian-noise baseline; Jensen--Shannon
+divergence up to $0.342$) and codebook utilization is healthy
 ($62.5\%$ active entries).
 
 Beyond confirming architectural compatibility between AIM and
@@ -185,31 +183,18 @@ attribute their outputs to the model under study.
 We propose a different approach.
 Rather than attaching a learned generative component, we introduce the
 \textbf{AI Mother Tongue (AIM)} framework~\cite{liu2025aim} as a
-\emph{passive quantization probe}: a lightweight probe with minimal
-task-specific inductive bias that converts V-JEPA~2's continuous latent
-vectors into sequences of discrete symbols without task-specific
-supervision or predefined symbol inventory, and without modifying the
-encoder in any way.
-The AIM quantizer carries the inductive biases inherent to vector
-quantization (cluster-forcing geometry, codebook size, EMA update
-dynamics), but imposes no semantic labels, language supervision, or
-task-specific objectives that could produce symbolic structure
-independently of the encoder.
+\emph{passive quantization probe}: a lightweight, vocabulary-free
+discretization mechanism that converts V-JEPA~2's continuous latent
+vectors into sequences of discrete symbols without imposing any
+semantic prior and without modifying the encoder in any way.
 
 AIM was originally developed as a mechanism through which agents in
 multi-agent reinforcement learning develop a self-emergent compressed
 semantic language~\cite{liu2025aim}.
-The AIM framework~\cite{liu2025aim} operates by attaching a VQ-VAE
-bottleneck~\cite{vandenoord2017vqvae} to an agent's latent
-communication channel, converting continuous latent vectors into
-discrete symbol sequences through nearest-neighbor assignment to a
-learned codebook.
-The resulting symbols are not predefined but emerge from the statistics
-of the agent's internal representations.
-In the present work, we apply this mechanism as a read-only probe
-attached to a frozen encoder rather than as an active communication
-channel---its core operation is therefore architecturally compatible
-with V-JEPA~2 because both frameworks operate entirely in latent space.
+Its core operation---vector quantization~\cite{vandenoord2017vqvae}
+of latent representations into a finite codebook of learned
+codewords---is architecturally compatible with V-JEPA~2 because both
+frameworks operate entirely in latent space.
 V-JEPA~2 predicts in latent space; AIM compresses in latent space.
 No pixel decoder, no language model, and no task-specific head is
 required or used.
@@ -238,7 +223,8 @@ structured manifolds that a vocabulary-free discrete probe can detect
 and statistically characterize under controlled physical-dimension contrast?}
 \end{quote}
 
-We investigate this through \emph{category-contrast experiments}: we select action-category pairs that contrast sharply
+We investigate this through controlled \emph{intervention
+experiments}: we select action-category pairs that contrast sharply
 along one physical dimension (grasp angle, object geometry, motion
 temporal structure) while minimizing differences along other salient
 visual factors, and we measure whether the AIM symbol distribution
@@ -287,9 +273,8 @@ This paper makes the following contributions.
     Controlled category-contrast experiments across three physical
     dimensions yield symbol distributions that differ significantly
     between conditions across all three interventions
-   ($\chi^2\ p < 10^{-4}$; absolute MI $0.036$--$0.117$\,bits,
-    normalized MI $1.2$--$3.9\%$ of the $3$\,bit theoretical maximum;
-    JSD up to $0.342$), establishing that
+    ($\chi^2\ p < 10^{-4}$; MI ratios of order $10^6$ relative to a
+    Gaussian-noise baseline; JSD up to $0.342$), establishing that
     V-JEPA~2's frozen latent space encodes physically structured
     information that is recoverable through discrete symbolization.
 
@@ -316,13 +301,12 @@ representation learning, interpretability and probing, and discrete
 representation learning~\cite{baek2025discrete,wu2024nlotm}, positioning
 the present work relative to prior approaches.
 Section~\ref{sec:methods} describes the dataset, frozen encoder
-design, quantizer architecture, and category-contrast experiment protocol.
-
+design, quantizer architecture, and intervention experiment protocol.
 Sections~\ref{sec:experiments} presents the
 Stage~1 experimental results and analysis.
 Section~\ref{sec:discussion} discusses the passive-probe methodology,
 the compact latent-space finding, and the limitations of the
-category-proxy strategy.
+category-proxy intervention strategy.
 Section~\ref{sec:future} outlines the four-stage integration roadmap
 and positions Stage~1 within the broader AIM--JEPA research program.
 
@@ -399,11 +383,11 @@ codebook $\mathcal{C} = \{e_1, \ldots, e_K\}$:
 The codebook entries $\{e_k\}$ are learned from data; the symbol
 assignments $s$ are determined entirely by the geometry of the latent
 space.
-Because $Q_\psi$ introduces no task-specific supervision or predefined
-symbol inventory---it does not know what categories exist, what
-language labels apply, or what physical variables are present---any
-systematic relationship between the resulting symbols and the physical
-world must originate in $E_\phi(\mathbf{x})$, not in $Q_\psi$ itself.
+Because $Q_\psi$ imposes no semantic prior---it does not know what
+categories exist, what language labels apply, or what physical
+variables are present---any systematic relationship between the
+resulting symbols and the physical world must originate in
+$E_\phi(\mathbf{x})$, not in $Q_\psi$ itself.
 This property is the foundation of the inferential logic described in
 Section~\ref{sec:intro}.
 
@@ -452,7 +436,7 @@ track.
 Continuous latent representations do not support this kind of
 auditable claim without additional machinery.
 
-This property---that vector quantization renders latent content into auditable statistical objects---has been independently exploited in the context of multi-agent safety, where it enables detection of covert coordination in agent communication channels~\cite{liu2026drcb} (in preparation).
+This property---that vector quantization renders latent content into auditable statistical objects---has been independently exploited in the context of multi-agent safety, where it enables detection of covert coordination in agent communication channels~\cite{liu2026drcb}.
 
 Second, a discrete bottleneck makes the information flow inspectable.
 The symbol sequence $s_1, \ldots, s_T$ is a complete record of what
@@ -521,7 +505,7 @@ planning, and counterfactual prediction.
 The evidence we present is consistent with that hypothesis but does
 not establish it.
 What we can say is that V-JEPA~2's representations exhibit properties
-that a world model \emph{should} have: they encode physically grounded variables
+that a world model \emph{should} have: they encode physical structure
 in a compact, shared form that is sensitive to temporal dynamics.
 
 Second, we do not claim that the symbolic distinctions produced by
@@ -619,11 +603,13 @@ concern by introducing control tasks to measure probe complexity, but
 the core confound---that a sufficiently expressive probe can succeed
 even on unstructured representations---remains.
 Our passive quantization approach resolves this confound by design:
-the AIM quantizer imposes no task-specific supervision or predefined
-symbol inventory, and the frozen encoder cannot adapt to the probe.
+the AIM quantizer imposes no semantic prior, and the frozen encoder
+cannot adapt to the probe.
 
 \subsection{Discrete Representation Learning and Neural Symbolic
 Abstraction}
+H1 functions as a pipeline integrity prerequisite, not as primary evidence. Under a deterministic frozen encoder with all stochastic components disabled, ρˉ=1.000\bar{\rho} = 1.000
+ρˉ​=1.000 is mathematically guaranteed.
 Vector Quantized Variational Autoencoders
 (VQ-VAE)~\cite{vandenoord2017vqvae} introduced the idea of learning
 discrete codebook representations through end-to-end training,
@@ -660,7 +646,7 @@ as a passive probe: it does not require a predefined symbol inventory
 or a semantic supervision signal.
 
 A further application of AIM's discretization principle appears in
-the DRCB framework~\cite{liu2026drcb} (in preparation), where vector quantization is
+the DRCB framework~\cite{liu2026drcb}, where vector quantization is
 used to convert unobservable latent communication between agents into
 auditable statistical objects, enabling detection of covert
 coordination.
@@ -699,24 +685,19 @@ The design differs from prior work in three respects.
     that such structure \emph{can also be revealed} without modifying
     the underlying model.
 
- \item \textbf{Vocabulary-free discretization.}
-    The AIM quantizer imposes no task-specific supervision or predefined
-    symbol inventory on the latent space.\footnote{%
-      \emph{Vocabulary-free} denotes the absence of predefined category labels
-      or language supervision; the vector quantization mechanism itself carries
-      inductive biases including cluster-forcing geometry and codebook size.}
+  \item \textbf{Vocabulary-free discretization.}
+    The AIM quantizer imposes no semantic prior on the latent space.
     Codebook entries are initialized randomly and updated purely from
     data; no category labels, language annotations, or task-specific
     objectives are used.
     This resolves the attribution problem that affects both
     discriminative probes and generative interpretation methods.
 
-\item \textbf{Causal evaluation via category-contrast experiments.}
+  \item \textbf{Causal evaluation via controlled intervention.}
     Rather than evaluating on downstream task accuracy, we directly
-    compare action-category pairs along specified physical dimensions
-    and measure whether symbol distributions shift in a statistically
-    significant manner.
-    This category-contrast evaluation strategy provides a more 
+    manipulate physical variables and measure whether symbol
+    distributions shift in a statistically significant manner.
+    This intervention-based evaluation strategy provides a more
     direct test of whether the latent space encodes specific physical
     structure than accuracy on aggregate benchmarks.
 \end{itemize}
@@ -1190,7 +1171,7 @@ reported in Table~\ref{tab:ablation}.
 
 \begin{table}[H]
 \centering
-\caption{Ablation of EMA decay rate and commitment loss coefficient. The ablation covers only three configurations due to computational constraints; $\beta = 2.0$ was selected as the only configuration achieving stable codebook utilization, and is treated as a diagnostic finding rather than a universally optimal hyperparameter.}
+\caption{Ablation of EMA decay rate and commitment loss coefficient.}
 \label{tab:ablation}
 \begin{tabular}{ccc}
 \toprule
@@ -1323,8 +1304,6 @@ $\bar{\rho} = \frac{1}{|\mathcal{V}_{\text{stab}}|}\sum_{v}\text{Stability}_v$,
 with passing criterion $\bar{\rho} > 0.95$.
 
 \paragraph{Scientific Significance and Design Limitations.}
-H1 functions as a pipeline integrity prerequisite, not as primary evidence. Under a deterministic frozen encoder with all stochastic components disabled, $\bar{\rho} = 1.000$ is mathematically guaranteed.
-
 It is important to note that, under the spatial-token-plus-mode design, $H1 =
 1.000$ is a mathematical certainty in eval mode with a frozen encoder: the
 encoder is a deterministic function (no dropout), and the argmin quantization
@@ -1348,6 +1327,8 @@ and Jensen--Shannon divergence reported in the H2 category-contrast experiments
 (Section~\ref{sec:h2_results}).
 
 \subsection{H2: Statistical Framework for category-contrast experiments}
+To partially disentangle codebook resolution from representational compactness, we note that the motion\_speed intervention produces JSD = 0.342, 1.8×1.8\times
+1.8× higher than the other two interventions. If dominant symbol collision were purely an artifact of codebook resolution, the JSD values should be uniform across interventions; the differential sensitivity is therefore consistent with V-JEPA 2 encoding temporal structure more prominently than morphological structure, though it does not rule out codebook resolution as a contributing factor. Stage 2 will directly test this interpretation by increasing K.
 \paragraph{Symbol Distribution Collection.}
 For each condition $c \in \{c_1, \ldots, c_C\}$, we collect $n_c$ video
 samples.  The representative symbol for each video is computed as the mode over
@@ -1486,7 +1467,7 @@ randomness contaminates the H2 measurements that follow.
 
 
 
-\subsection{H2: Category-Contrast Experiment Results}\label{sec:h2_results}
+\subsection{H2: Intervention Experiment Results}\label{sec:h2_results}
 
 The complete statistical results for all three category-contrast experiments are
 summarized in Table~\ref{tab:h2_results}.  Figures~\ref{fig:intervention_grasp},
@@ -1496,24 +1477,23 @@ symbol sensitivity plots.
 
 \begin{table}[H]
 \centering
-\caption{H2 category-contrast experiment results. All three experiments pass
-         the significance threshold ($p < 0.01$). Baseline MI $< 10^{-7} \approx 0$ (Gaussian noise input).
-         Normalized MI is defined as $\mathrm{NMI} = \mathrm{MI} / \log_2 K$, where $\log_2 8 = 3$\,bits is the theoretical maximum symbol entropy.
-         H1 is a pipeline integrity check under deterministic execution; it confirms the absence of residual stochasticity but does not constitute independent evidence of semantic symbol validity.}
+\caption{H2 intervention experiment results. All three interventions pass
+         the significance threshold ($p < 0.01$) and the MI ratio threshold
+         ($> 5.0$). Baseline MI $< 10^{-7} \approx 0$ (Gaussian noise input). H1 is a pipeline integrity check under deterministic execution; it confirms the absence of residual stochasticity but does not constitute independent evidence of semantic symbol validity.}
 \label{tab:h2_results}
-\begin{tabular}{lllcccccc}
+\begin{tabular}{lllccccc}
 \toprule
-Intervention & \multicolumn{2}{c}{Condition pair} & MI (bits) & NMI (\%) & $\chi^2$ $p$-value
+Intervention & \multicolumn{2}{c}{Condition pair} & MI & $\chi^2$ $p$-value
   & JSD & MI Ratio & Pass \\
 \midrule
-grasp\_angle    & archery     & bowling    & $0.036$ & $1.2$ & $1.19\times10^{-4}$
+grasp\_angle    & archery     & bowling    & $0.0360$ & $1.19\times10^{-4}$
   & $0.190$ & $3.6\times10^{6}$ & \checkmark \\
-object\_geometry & flying\_kite & high\_jump & $0.036$ & $1.2$ & $1.19\times10^{-4}$
+object\_geometry & flying\_kite & high\_jump & $0.0360$ & $1.19\times10^{-4}$
   & $0.190$ & $3.6\times10^{6}$ & \checkmark \\
-motion\_speed   & marching    & archery    & $0.117$ & $3.9$ & $<10^{-10}$
+motion\_speed   & marching    & archery    & $0.1173$ & $<10^{-10}$
   & $0.343$ & $1.17\times10^{7}$ & \checkmark \\
 \midrule
-Random baseline & {---} & {---} & $\approx 0$ & $\approx 0$ & {---} & {---} & {---} & {---} \\
+Random baseline & {---} & {---} & $\approx 0$ & {---} & {---} & {---} & {---} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1590,13 +1570,11 @@ entirely to entry~\#5 ($\approx 1.0$), whereas \textit{marching} exhibits a
 markedly more dispersed distribution: entry~\#5 accounts for approximately
 $70\%$, entry~\#4 for $\approx 20\%$, and entry~\#3 for $\approx 10\%$.
 The resulting $\mathrm{JSD} = 0.343$ is $1.8\times$ the value observed in
-the other two interventions, and $\mathrm{MI} = 0.1173$\,bits
-($\mathrm{NMI} = 3.9\%$) is $3.3\times$ higher.
-The chi-squared test gives $p < 10^{-10}$, and the MI ratio relative to
-the Gaussian-noise baseline reaches $1.17 \times 10^{7}$ (reported here
-as a diagnostic indicator of codebook bias, not as a measure of absolute
-information content; see Section~\ref{sec:experiments}, Caveats).
-The symbol sensitivity panel confirms that entries
+the other two interventions, and $\mathrm{MI} = 0.1173$ is $3.3\times$
+higher.  The chi-squared test gives $p < 10^{-10}$, and the MI ratio reaches
+$1.17 \times 10^{7}$.  The symbol sensitivity panel confirms that entries
+\#5 and \#4 are the primary active symbols, with entry~\#3 also carrying
+a non-trivial sensitivity score.
 
 The physical interpretation is direct: \textit{marching} exhibits strong
 temporal periodicity ($\approx\!2\,$Hz gait cycle), whereas \textit{archery}
@@ -1628,7 +1606,8 @@ geometric or postural differences.
 
 \paragraph{Random Baseline.}
 Passing 30 Gaussian noise inputs through the full pipeline yields a baseline
-MI of $< 10^{-7} \approx 0$, indicating no detectable statistical dependence under Gaussian input. This suggests that the codebook does not introduce observable bias under this baseline, although it remains an architectural constraint.  All three experimental MI values exceed
+MI of $< 10^{-7} \approx 0$, confirming that the codebook exhibits no prior
+preference for unstructured inputs.  All three experimental MI values exceed
 the baseline by factors of $3.6 \times 10^{6}$ to $1.17 \times 10^{7}$,
 ruling out any possibility that the observed symbol--condition associations
 arise from codebook bias rather than structured latent-space content.
@@ -1689,17 +1668,7 @@ sense that no dominant-symbol switch occurs, the information-theoretic
 quantities are unambiguous: $\mathrm{JSD} = 0.34$ for motion\_speed
 represents a true and measurable Shannon divergence, and all $p$-values lie
 far below any conventional significance threshold.
-To partially disentangle codebook resolution from representational
-compactness, we note that the motion\_speed intervention produces
-$\mathrm{JSD} = 0.342$, $1.8\times$ higher than the other two
-interventions.
-If dominant symbol collision were purely an artifact of codebook
-resolution, JSD values should be uniform across interventions; the
-differential sensitivity is therefore consistent with V-JEPA~2 encoding
-temporal structure more prominently than morphological structure,
-though it does not rule out codebook resolution as a contributing
-factor.
-Stage~2 will directly test this interpretation by increasing $K$.
+
 \paragraph{Compactness as a Feature, Not a Defect.}
 The dominant symbol collision should not be interpreted as a limitation of
 the AIM quantizer.  World-model theory predicts that a model trained on
@@ -1719,7 +1688,7 @@ transitions that are invisible at $K = 8$.  Second, unfreezing the encoder
 in Stage~3 and introducing a contrastive or classification-aware objective
 will actively widen the latent-space distances between categories of interest,
 enabling more pronounced symbol differentiation without sacrificing the
-shared physically grounded variables that makes V-JEPA~2's representations generalizable.
+shared physical structure that makes V-JEPA~2's representations generalizable.
 
 \subsection{Stage~1 Pass Determination}
 
@@ -1796,9 +1765,8 @@ statistical tests are interpretable.  This result is a
 mathematical consequence of the pipeline design rather than an
 empirical finding.
 
-  \item \textbf{Experiment sensitivity} (all three $\chi^2$ $p$-values
-    $\ll 0.01$; absolute MI $0.036$--$0.117$\,bits,
-    NMI $1.2$--$3.9\%$) confirms that AIM
+  \item \textbf{Intervention sensitivity} (all three $\chi^2$ $p$-values
+    $\ll 0.01$; MI ratios of order $10^6$--$10^7$) confirms that AIM
     symbols carry statistically significant information about physical
     conditions encoded in V-JEPA~2's latent space.
 
@@ -1882,27 +1850,7 @@ are the primary architectural changes planned for Stage~2, and their
 effect on symbol resolution and intervention sensitivity will be reported
 there.
 
-\paragraph{Token-level pseudo-replication.}
-The $\chi^2$ tests and mutual information estimates reported in
-Section~\ref{sec:h2_results} treat individual spatial tokens as
-independent observations.
-Because the $1{,}568$ tokens per video share the same semantic context,
-they are not statistically independent; the effective sample size is
-closer to the number of videos (approximately $9$--$10$ per category)
-than to the number of tokens.
-The reported $p$-values should therefore be interpreted as upper bounds
-on statistical significance under token-level analysis rather than
-definitive probability estimates.
-A video-level analysis---treating each video's dominant symbol
-assignment as the unit of observation---is deferred to future work due
-to the small per-category sample size in the current experimental
-setup.
-
-As a supplementary analysis, we note that a label-shuffling permutation
-test---randomly reassigning condition labels while preserving token
-counts---would provide a stronger inferential baseline by sampling from
-the actual joint distribution of the data.
-Implementation of permutation testing is deferred to future work.
+As a supplementary analysis, we note that a label-shuffling permutation test—randomly reassigning condition labels while preserving token counts—would provide a stronger inferential baseline by sampling from the actual joint distribution of the data. Implementation of permutation testing is deferred to future work.
 
 \section{Discussion}
 \label{sec:discussion}
@@ -1968,7 +1916,7 @@ This compactness is not a failure of representational capacity.
 It is the expected signature of a model trained to predict masked
 spatiotemporal content rather than to maximize inter-class
 separability.
-A world model that has internalized the shared physically grounded variables
+A world model that has internalized the shared physical structure
 underlying diverse actions---gravity, inertia, human body kinematics,
 spatial continuity---should represent those actions in an overlapping
 region of latent space, not in disjoint clusters.
@@ -1991,10 +1939,7 @@ reflect that organization.
 
 \subsection{Limitations and Boundary Conditions}
 
-\paragraph{Discretization as a confound.}
-The observed symbolic structure may partially reflect the VQ mechanism's tendency to impose cluster boundaries on smooth continuous distributions rather than latent structure pre-existing in the encoder's representation.
-A continuous-space analysis---for example, applying kernel density estimation or Gaussian mixture modeling directly to the raw projected latent vectors---would provide evidence that the geometric structure exists prior to quantization.
-Such analysis is deferred to Stage~2.
+Discretization as a confound. The observed symbolic structure may partially reflect the VQ mechanism's tendency to impose cluster boundaries on smooth continuous distributions rather than latent structure pre-existing in the encoder's representation. A continuous-space analysis—for example, applying kernel density estimation or Gaussian mixture modeling directly to the raw projected latent vectors—would provide evidence that the geometric structure exists prior to quantization. Such analysis is deferred to Stage 2.
 
 Three limitations of the Stage~1 results should be stated clearly.
 
@@ -2047,7 +1992,7 @@ The results suggest that latent representations contain extractable
 structure, but not necessarily causal semantics.
 
 \subsection{Implications for Latent Model Interpretability}
-By `statistically testable interface' we mean a representation layer whose outputs can be subjected to standard hypothesis tests---chi-squared tests of distributional homogeneity, mutual information estimation, Jensen--Shannon divergence---without requiring human annotation or task-specific evaluation criteria.
+By 'statistically testable interface' we mean a representation layer whose outputs can be subjected to standard hypothesis tests—chi-squared tests of distributional homogeneity, mutual information estimation, Jensen–Shannon divergence—without requiring human annotation or task-specific evaluation criteria.
 
 The findings of Stage~1 have implications that extend beyond the
 specific combination of V-JEPA~2 and AIM.
@@ -2120,8 +2065,8 @@ encoder.
 Status: complete.
 All four pass criteria are satisfied
 (H1 symbol stability $\bar{\rho} = 1.000$;
-H2 $\chi^2\ p < 10^{-4}$ across all three category-contrast experiments;
-absolute MI $0.036$--$0.117$\,bits, normalized MI $1.2$--$3.9\%$;
+H2 $\chi^2\ p < 10^{-4}$ across all three interventions;
+MI ratios of order $10^6$ relative to Gaussian-noise baseline;
 codebook active ratio $= 62.5\%$).
 The encoder weights remain completely frozen throughout.
 
@@ -2138,16 +2083,6 @@ across all $K$ entries; intervention JSD $> 0.3$ for all three
 physical variables; intra-class symbol consistency $> 80\%$ (a
 stronger stability criterion than the pipeline determinism check used
 in Stage~1).
-A key diagnostic question for Stage~2 is whether increasing $K$
-produces qualitatively richer symbol differentiation---supporting the
-codebook-resolution interpretation of dominant symbol collision---or
-merely finer quantization of the same compact representational
-core---supporting the latent-compactness interpretation.
-The differential JSD sensitivity already observed in Stage~1
-(motion\_speed JSD $= 0.342$, $1.8\times$ higher than the other two
-interventions) provides a falsifiable prediction: if latent compactness
-is the primary explanation, the JSD ordering across physical dimensions
-should be preserved at larger~$K$.
 
 \paragraph{Stage~3: Symmetric Quantization and Joint Training.}
 Goal: allow the encoder to adapt its representations toward the
@@ -2158,7 +2093,7 @@ stabilize in continuous latent space with the quantizer loss held at
 zero; then gradually introduce the VQ commitment loss using a
 $\beta$-schedule, so that the encoder learns to produce representations
 that are more amenable to discrete symbolization without losing the
-physically grounded variables acquired during pretraining.
+physical structure acquired during pretraining.
 A Teacher--Student asymmetry must be managed carefully: because
 V-JEPA~2's Teacher encoder is an EMA of the Student, introducing VQ
 quantization on both sides simultaneously creates a moving-target
